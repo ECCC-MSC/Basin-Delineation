@@ -27,12 +27,14 @@ UpslopeDEM <- function(point, in.DEM, saga.env, outdir, pointbuffer=150, dem.cli
     projected.CRS <- GetProj4("AlbersEqualAreaConic")
   }
   iterate.to <- max(c(iterate.to, pointbuffer))
+  in.DEM <- gsub("\\.sdat$", "\\.sgrd", in.DEM)
 
   # prepare workspace
   oldwd <- getwd()
   setwd(saga.env$workspace)
   outdir <- gsub("[\\/]$","",outdir)
-  # get name
+
+  # get name of station
   station_name <- point@data[1,grepl("^\\d{2}[[:alpha:]]{2}\\d{3}$", point@data)]
   print(station_name)
   final.name <- file.path(outdir, paste(station_name,"_upslope.shp",sep=''))
@@ -42,7 +44,7 @@ UpslopeDEM <- function(point, in.DEM, saga.env, outdir, pointbuffer=150, dem.cli
     point <- sp::spTransform(point, CRSobj = CRS(projected.CRS))
   }
 
-  # Find missing DEM if necessary / Convert adf to sgrd if necessary.  Could be more elegant
+  # Find missing DEM if necessary / Convert to sgrd if necessary.
   if (!grepl("\\.sgrd$", in.DEM)){  # if not an SGRD file (then we expect a directory or a list of names)
     name <- HydroMosaic(point@data$longitude, point@data$latitude, tol=dem.clip.square)
     if (length(name)==1){
@@ -65,10 +67,13 @@ UpslopeDEM <- function(point, in.DEM, saga.env, outdir, pointbuffer=150, dem.cli
   }
 
   # Clip grid to point
+  if (dem.clip.square>0){
   ClipGridRS(point, in.DEM, 'clipped.sgrd', saga.env, tol=dem.clip.square, ...)
+  }
 
   # Fill Sinks
-  FillSinksRS('clipped.sgrd', 'filled.sgrd', saga.env, MINSLOPE=0.01, ...)
+  FillSinksRS(ifelse(dem.clip.square>0,'clipped.sgrd',in.DEM),
+              'filled.sgrd', saga.env, MINSLOPE=0.01, ...)
 
 
   while (pointbuffer <= iterate.to){
@@ -176,7 +181,7 @@ ClipPolygonRS <- function(input, clipping.layer, output, saga.env,verbose=F){
                               CLIP=clipping.layer,
                               S_INPUT=input,
                               S_OUTPUT=output,
-                              DISSOLVE=1,
+                              DISSOLVE=1
                               ))
 }
 
@@ -334,19 +339,23 @@ MoisaicRS <- function(grids, out_grid, saga.env, xmin, xmax, ymin, ymax, cellsiz
 #' @keywords internal
 #' @export
 gdal_warp2SAGA <- function(srcfile, dstfile, outputCRS, srcnodata=-32768, dstnodata=-32767, s_srs="EPSG:4326"){
+  print("warping raster...")
   srcfile <- gsub('[\\/]$', '', srcfile)
   if (missing(dstfile)) dstfile <- gsub("\\.(.{2,5})$","_warped\\.sdat",srcfile)
   gdalUtils::gdalwarp(srcfile=srcfile,
            dstfile=dstfile,
            srcnodata=srcnodata, dstnodata=dstnodata,
            s_srs = s_srs, t_srs=outputCRS, of = "SAGA", r='near', overwrite=T, stderr=T)
+  return(dstfile)
 }
 
 gdal_mosaic <- function(srcfiles, dstfile, srcnodata=-32768, dstnodata, of="SAGA"){
+  print("building mosaic...")
   gdalUtils::mosaic_rasters(gdalfile=srcfiles,
                       dst_dataset=dstfile,
                       srcnodata=srcnodata, dstnodata=dstnodata,
                       of = "SAGA", r='near', overwrite=T, stderr=T)
+  return(dstfile)
 }
 
 #' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.

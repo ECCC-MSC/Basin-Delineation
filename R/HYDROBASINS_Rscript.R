@@ -64,10 +64,10 @@ FindAllUpstreamSubBasins <- function(HYBAS, HYBAS.ID, ignore.endorheic=F, split=
   # make containers and stuff
   HYBAS.ID <- as.character(HYBAS.ID)
   HYBAS.ID.master <- list()
-  
+
   #Get the possible upstream 'branches'
   direct.upstream <- FindUpstreamSubBasins(HYBAS = HYBAS, HYBAS.ID = HYBAS.ID, ignore.endorheic = ignore.endorheic)
-  
+
   # for each branch iterate upstream until only returning empty results
   for (i in direct.upstream){
     run <- T
@@ -82,7 +82,7 @@ FindAllUpstreamSubBasins <- function(HYBAS, HYBAS.ID, ignore.endorheic=F, split=
     HYBAS.ID.master[[i]] <- HYBAS.ID.list
   }
   if (!split) HYBAS.ID.master <- as.character(unlist(HYBAS.ID.master))
-  
+
  return(HYBAS.ID.master)
 }
 
@@ -111,7 +111,7 @@ plot.subset.HYBAS <- function(HYBAS, HYBAS.ID, text=T){
 }
 
 #' Upstream Basin
-#' 
+#'
 #' @description Return the upstream basin polygon for a station
 #' @param x either a hybas ID or a HYDAT station ID
 #' @param include.first whether or not to include the enclosing hybas polygon (overestimation)
@@ -122,7 +122,7 @@ upstream.basin <- function(station, HYBAS, include.first=T, ignore.endorheic=F){
   st.ar.gr <- NA
   st.ar.ef <- NA
   if (is.character(x) | is.factor(x)){
-    if (grepl('\\d{10}', x)) HYBAS.ID <- as.character(x) 
+    if (grepl('\\d{10}', x)) HYBAS.ID <- as.character(x)
     if (grepl('\\d{2}[A-Za-z]{2}\\d{3}', x)) print("HYDAT needs to be a spatial object")
   }else{
     HYBAS.ID <- as.character(spatialEco::point.in.poly(x,HYBAS)$HYBAS_ID)  # Find ID of containing hydrobasins polygon
@@ -139,7 +139,7 @@ upstream.basin <- function(station, HYBAS, include.first=T, ignore.endorheic=F){
   upstreamIDs <- FindAllUpstreamSubBasins(HYBAS, HYBAS.ID, ignore.endorheic=ignore.endorheic)
   if (include.first){ upstreamIDs <- c(upstreamIDs, HYBAS.ID)}
   subset <- HYBAS[HYBAS$HYBAS_ID %in% upstreamIDs,]
-  
+
   # Transform to get area
   subset.t <-  rgeos::gUnaryUnion(sp::spTransform(subset, CRSobj = CRS.AlbersEqualAreaConic))
   area <- rgeos::gArea(subset.t, byid = F)/1e6
@@ -151,17 +151,17 @@ upstream.basin <- function(station, HYBAS, include.first=T, ignore.endorheic=F){
   # ID=1)))
   # ring@proj4string <- subset.t@proj4string
   # area.ring <- rgeos::gArea(ring, byid = F)/1e6
-  
+
   # merge polygon and store area measurements
   out <- rgeos::gUnaryUnion(subset)
   row.names(out) <- as.character(1:length(out))
   data <- as.data.frame(list(
-    HYBAS=HYBAS.ID, 
-    station=station, 
+    HYBAS=HYBAS.ID,
+    station=station,
     station_eff=st.ar.ef,
     station_gro=st.ar.gr,
-    area=area, 
-    filled_area=area.ring, 
+    area=area,
+    filled_area=area.ring,
     HYB_UP_AR=HYBAS@data[HYBAS$HYBAS_ID==HYBAS.ID,"UP_AREA"]))
   out <- SpatialPolygonsDataFrame(out, data)
   return(out)
@@ -170,21 +170,21 @@ upstream.basin <- function(station, HYBAS, include.first=T, ignore.endorheic=F){
 }
 
 #' Upstream Basin 2
-#' 
+#'
 #' @description Return the upstream basin polygon for a station
 #' @param station A SpatialPointsDataFrame corresponding to the station of intrest
 #' @param ignore.endorheic logical, whether or not to include 'virtual connections' in the HydroSHEDS topology
 #' @return a spatial polygon data frame of the upstream basin in the CRS of the hybas polygon (should be WGS84)
 UpstreamHYBAS <- function(station, HYBAS, ignore.endorheic=F, fast=T){
-  
+
   if (!station@proj4string@projargs == HYBAS@proj4string@projargs){  # Ensure both are in HYBAS CRS (likely WGS84)
     station <- sp::spTransform(station, CRSobj = CRS(HYBAS@proj4string@projargs))
   }
-  
+
   if (fast){ # subset basins first
     HYBAS <- HYBAS[substr(HYBAS$PFAF_ID,1,3) %in% NearestHYBAS(station@data$station_number), ]
   }
-  
+
   HYBAS.ID <- as.character(spatialEco::point.in.poly(station, HYBAS)$HYBAS_ID)  # Find ID of containing hydrobasins polygon
     if (length(HYBAS.ID) == 0){ # point outside of HYBAS polygons
       print("Point is outside of HYBAS")  #TODO: This needs a better solution
@@ -192,7 +192,7 @@ UpstreamHYBAS <- function(station, HYBAS, ignore.endorheic=F, fast=T){
     }else{
       print(sprintf("Station is within HYBAS polygon %s", HYBAS.ID))
     }
-  
+
   ## For a given HYBAS ID, get all the upstream basins and their areas
   upstreamIDs <- FindAllUpstreamSubBasins(HYBAS, HYBAS.ID, ignore.endorheic=ignore.endorheic, split = T)
   out <- HYBAS[match(c(HYBAS.ID ,unlist(upstreamIDs)), HYBAS@data$HYBAS_ID, nomatch=0),]
@@ -240,7 +240,7 @@ FindNearestRiverSegment <- function(spatialPoint, riverLines, HYBAS){
     snappedcoords <- t(as.matrix(maptools::nearestPointOnLine(
       x@lines[[1]]@Lines[[1]]@coords, spatialPoint[i,]@coords)))
   }
-  
+
   #return coordinate of point
  # maptools::nearestPointOnLine(x@lines[[1]]@Lines[[1]]@coords, spatialPoint[i,]@coords )
   # return ID of nearest river segment(s)
@@ -254,16 +254,17 @@ FindNearestRiverSegment <- function(spatialPoint, riverLines, HYBAS){
 #' @param station Either a SpatialPointsDataFrame or the path to a Hydat-exported table with desired points
 #' or a character vector of station names (in this case a connection must be specified)
 #' @param con (optional) A open database connection.  Used if station is a character vector of station names
-#' @param outdir (optional) A directory to which the output shapefile and report will be saved.  If not specified, 
+#' @param outdir (optional) A directory to which the output shapefile and report will be saved.  If not specified,
 #' the function will return an R object without saving data to disk.
-#' @param NCA (optional) Either a character string path or a SpatialPolygonsDataFrame.  This is a polygon 
+#' @param NCA (optional) Either a character string path or a SpatialPolygonsDataFrame.  This is a polygon
 #' of the non-contributing areas.  If provided, calculates effective drainage area
 #' @return A SpatialPolygonDataFrame
-StationPolygon <- function(station, con, outdir, HYBAS, DEM, saga.env, NCA, interactive=F, ...){
-  
+StationPolygon <- function(station, con, outdir, HYBAS, DEM, saga.env, NCA, interactive=F,
+                           projected.CRS="+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs", ...){
+
   # Figure out what "station" is and read it in
   if (class(station) == "SpatialPointsDataFrame"){
-   print("detected a spatial object for: 'station'") 
+   print("detected a spatial object for: 'station'")
   }else if (!missing(con) & class(station)=="character"){
     print("reading 'station' from database connection")
     station <- SpatialHydat(con, station)
@@ -273,61 +274,63 @@ StationPolygon <- function(station, con, outdir, HYBAS, DEM, saga.env, NCA, inte
   }else{
     print("could not read 'station' information")
   }
-  
+
   #=============
-  # Calculations 
+  # Calculations
   #=============
-  
+
+  # Get upslope area from HYBAS
+  HYB.Poly <- UpstreamHYBAS(station, HYBAS)
+
+  # Get index tiles (if using NTS grids)
+
   # Get upslope area from DEM
-  DEM.Poly <- UpslopeDEM(station, in.DEM = DEM, saga.env = saga.env, 
-             outdir = saga.env$workspace, ...)
-  
+  DEM.Poly <- UpslopeDEM(station, in.DEM = DEM, saga.env = saga.env,
+                         outdir = saga.env$workspace, projected.CRS=projected.CRS, ...)
   DEM.Poly.p <- invisible(rgdal::readOGR(DEM.Poly))
   DEM.Poly.p <- DEM.Poly.p[which.max(area(DEM.Poly.p)),] # take the big one.  others are junk
- 
-   # Get upslope area from HYBAS
-  HYB.Poly <- UpstreamHYBAS(station, HYBAS)  
-  HP.p <- sp::spTransform(HYB.Poly, CRSobj = sp::CRS(DEM.Poly.p@proj4string@projargs))
-  
+
+
   # Clip 'nose' of basin
+  HP.p <- sp::spTransform(HYB.Poly, CRSobj = sp::CRS(DEM.Poly.p@proj4string@projargs))
   local.drainage.p <- gIntersection(HP.p[1,], DEM.Poly.p, byid = F, drop_lower_td = TRUE) # DEM area within containing hybas
-  
+
   # Calculate non-contributing areas
   if (!missing(NCA)){
-    # check if NCA is a shapefile or a loaded object.  if its a shapefile, load it 
+    # check if NCA is a shapefile or a loaded object.  if its a shapefile, load it
     # validate CRS
-    # 
+    # drainage.effective <- area(object)
     print("take out non-contributing area") # take out non-contributing area
   }else{
     drainage.effective <- NA
   }
-  
-  #=====================  
+
+  #=====================
   #  Logical Steps
   #=====================
- # match.drain <- which(grepl("^(?=.*drainage)(?!.*eff)", tolower(names(p)), perl=TRUE)) # find drainage column
+
   dr.ar <- station@data[1,"drainage_area_gross"]
   if (!is.na(dr.ar) &dr.ar <= 100 & dr.ar > 0) {
     print("Using local basin")
   }
-  
+
   if (interactive){
     plot(HP.p)
     polygonsLabel(HP.p, labels=row.names(HP.p), method='centroid')
     plot(local.drainage.p, col='red', add=T)
     readline("Which polygons to keep?")
   }
-  
+
   # gDisjoint() # if DEM is disjoint, ignore the rest
-  
+
   # merge desired parts
   HP.p <- gUnaryUnion(HP.p[-1,])
-  
+
   output <- gUnion(local.drainage.p, HP.p)
   dr_ar <- area(output) *1e-6
-  
+
   # transform and calculate drainage area
-  
+
   # create attribute table
   data <- as.data.frame(list(  # make output table
     stn_number=station@data$station_number,
@@ -338,11 +341,11 @@ StationPolygon <- function(station, con, outdir, HYBAS, DEM, saga.env, NCA, inte
   ))
 
    output <- SpatialPolygonsDataFrame(output, data)
-  
+
   # write output shapefile (rgdal::writeOGR)
   name <- paste(station$station_number, "_basin.shp")
   rgdal::writeOGR(output, dsn=file.path(outdir, name), layer=name, driver="ESRI Shapefile")
-  
+
   # write output table (optional?)
   tablename <- paste(station$station_number, "_basin.csv")
   write.csv(output@data, file.path(outdir, tablename), row.names=F)
@@ -350,10 +353,10 @@ StationPolygon <- function(station, con, outdir, HYBAS, DEM, saga.env, NCA, inte
 }
 
 #' Upstream Area
-#' 
+#'
 #' @description Finds basin area from raster flow direction and accumulation maps
 #' @param point spatial point or polygon
-#' @param flow.direction 
+#' @param flow.direction
 #' @param flow.accu flow accumulation raster
 UpstreamBasin <- function(point, flow.direction, flow.accu){
 return(NULL)
