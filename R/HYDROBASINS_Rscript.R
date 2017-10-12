@@ -196,9 +196,13 @@ UpstreamHYBAS <- function(station, HYBAS, ignore.endorheic=F, fast=T){
   ## For a given HYBAS ID, get all the upstream basins and their areas
   upstreamIDs <- FindAllUpstreamSubBasins(HYBAS, HYBAS.ID, ignore.endorheic=ignore.endorheic, split = T)
   out <- HYBAS[match(c(HYBAS.ID ,unlist(upstreamIDs)), HYBAS@data$HYBAS_ID, nomatch=0),]
-  names(upstreamIDs) <- LETTERS[2:(length(upstreamIDs)+1)]
-  id <- lapply(names(upstreamIDs), function(x) upstreamIDs[[x]] <- rep(x, length(upstreamIDs[[x]])))
-  out <- rgeos::gUnaryUnion(out, id=c("A",unlist(id)))
+  id <- list()
+  if (length(upstreamIDs)!=0){
+    names(upstreamIDs) <- LETTERS[2:(length(upstreamIDs)+1)]
+    id <- lapply(names(upstreamIDs), function(x) upstreamIDs[[x]] <- rep(x, length(upstreamIDs[[x]])))
+  }
+  out@data$ID <- c("A",unlist(id))
+ # out <- rgeos::gUnaryUnion(out, id=c("A",unlist(id)))
   return(out)
 }
 
@@ -254,12 +258,13 @@ FindNearestRiverSegment <- function(spatialPoint, riverLines, HYBAS){
 #' @param station Either a SpatialPointsDataFrame or the path to a Hydat-exported table with desired points
 #' or a character vector of station names (in this case a connection must be specified)
 #' @param con (optional) A open database connection.  Used if station is a character vector of station names
+#' @param DEM either
 #' @param outdir (optional) A directory to which the output shapefile and report will be saved.  If not specified,
 #' the function will return an R object without saving data to disk.
 #' @param NCA (optional) Either a character string path or a SpatialPolygonsDataFrame.  This is a polygon
 #' of the non-contributing areas.  If provided, calculates effective drainage area
 #' @return A SpatialPolygonDataFrame
-StationPolygon <- function(station, con, outdir, HYBAS, DEM, saga.env, NCA, interactive=F,
+StationPolygon <- function(station, con, outdir, HYBAS, DEM.path, DEM.source, saga.env, NCA, interactive=F,
                            projected.CRS="+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs", ...){
 
   # Figure out what "station" is and read it in
@@ -278,59 +283,103 @@ StationPolygon <- function(station, con, outdir, HYBAS, DEM, saga.env, NCA, inte
   #=============
   # Calculations
   #=============
-
+  
   # Get upslope area from HYBAS
-  HYB.Poly <- UpstreamHYBAS(station, HYBAS)
-
-  # Get index tiles (if using NTS grids)
+  HYB.Poly.individual <- UpstreamHYBAS(station, HYBAS)
+  HYB.Poly <- rgeos::gUnaryUnion(HYB.Poly.individual, id=HYB.Poly.individual$ID) # combined area
+  no.upstream.hyb <- (length(HYB.Poly.individual) == 1)
+  
+  # Get first two upstream tiles (should be the first one for each ID)
+  first.up <- unlist(by(data = HYB.Poly.individual@data, INDICES = HYB.Poly.individual@data$ID,
+                     FUN = function(x) as.character(x[which.max(as.character(x$UP_AREA)),c("HYBAS_ID")])))
+  first.up.HYB <- HYB.Poly.individual[HYB.Poly.individual$HYBAS_ID %in% first.up & HYB.Poly.individual$ENDO != 2,]
+  first.up.HYB.endo <- HYB.Poly.individual[HYB.Poly.individual$HYBAS_ID %in% first.up,]
+  
+  
+  # find any endorheic basins
+  endo.HYB <- HYB.Poly.individual@data[HYB.Poly.individual$HYBAS_ID %in% first.up & HYB.Poly.individual$ENDO == 2,"ID"]
+  ID.list <- sapply(slot(HYB.Poly, "polygons"), function(x) slot(x, "ID"))
+  endo <- ID.list %in% endo.HYB
+  
+  disjoint <- rep(F, length(endo))
+  not.unlikely <- rep(F, length(endo))
+  
+  # find necessary coverage for DEM
+  
+  DEM.path <- OverlayNTS(gUnaryUnion(first.up.HYB), 
+                         NTS50k, saga.env$workspace, saga.env$workspace,
+                         tilename="NTS_SNRC")
 
   # Get upslope area from DEM
-  DEM.Poly <- UpslopeDEM(station, in.DEM = DEM, saga.env = saga.env,
+  DEM.Poly <- UpslopeDEM(station, DEM.path = DEM.path, saga.env = saga.env,
                          outdir = saga.env$workspace, projected.CRS=projected.CRS, ...)
   DEM.Poly.p <- invisible(rgdal::readOGR(DEM.Poly))
-  DEM.Poly.p <- DEM.Poly.p[which.max(area(DEM.Poly.p)),] # take the big one.  others are junk
+  DEM.Poly.p <- DEM.Poly.p[which.max(area(DEM.Poly.p)),] # take the big one.  others will likely have bad geometries
 
 
   # Clip 'nose' of basin
   HP.p <- sp::spTransform(HYB.Poly, CRSobj = sp::CRS(DEM.Poly.p@proj4string@projargs))
   local.drainage.p <- gIntersection(HP.p[1,], DEM.Poly.p, byid = F, drop_lower_td = TRUE) # DEM area within containing hybas
 
-  # Calculate non-contributing areas
-  if (!missing(NCA)){
-    # check if NCA is a shapefile or a loaded object.  if its a shapefile, load it
-    # validate CRS
-    # drainage.effective <- area(object)
-    print("take out non-contributing area") # take out non-contributing area
-  }else{
-    drainage.effective <- NA
-  }
 
   #=====================
   #  Logical Steps
   #=====================
 
-  dr.ar <- station@data[1,"drainage_area_gross"]
-  if (!is.na(dr.ar) &dr.ar <= 100 & dr.ar > 0) {
-    print("Using local basin")
+  # dr.ar <- station@data[1,"drainage_area_gross"]
+  # if (!is.na(dr.ar) &dr.ar <= 100 & dr.ar > 0) {
+  #   print("Using local basin")
+  # }
+# 
+#   if (interactive){
+#     plot(HP.p)
+#     polygonsLabel(HP.p, labels=row.names(HP.p), method='centroid')
+#     plot(local.drainage.p, col='red', add=T)
+#     readline("Which polygons to keep?")
+#   }
+  
+  if (!no.upstream.hyb){
+    # if DEM is disjoint with upslope area, do not include it.
+    disjoint <- gDisjoint(HP.p, local.drainage.p, byid = T)
+    
+    # if calculated total upslope area is less than half of an upslope HYBAS region, remove that HYBAS region
+    not.unlikely <- area(DEM.Poly.p) > 0.5*area(sp::spTransform(first.up.HYB.endo, CRS(DEM.Poly.p@proj4string@projargs)))
+    # regions.to.keep <- first.up.HYB@data[not.unlikely, "ID"] #remove first one (containing polygon)
+    # regions.to.keep <- regions.to.keep[regions.to.keep %in% sapply(HP.p@polygons, slot, name='ID') & 
+    #                                      regions.to.keep != "A"]
+    #HP.p <- HP.p[regions.to.keep,]
+  }
+  
+  keep <- ID.list[(!disjoint | endo) & (not.unlikely | endo)]
+  keep <- keep[-which(keep=="A")]
+  HP.p <- HP.p[keep,]
+  
+  # merge desired parts of HYBAS polygons with local drainage
+  if (length(HP.p) > 0 & !no.upstream.hyb){
+    HP.p <- gUnaryUnion(HP.p)
+    output <- gUnion(local.drainage.p, HP.p)
+  }else{
+    output <- gUnaryUnion(local.drainage.p)
   }
 
-  if (interactive){
-    plot(HP.p)
-    polygonsLabel(HP.p, labels=row.names(HP.p), method='centroid')
-    plot(local.drainage.p, col='red', add=T)
-    readline("Which polygons to keep?")
-  }
-
-  # gDisjoint() # if DEM is disjoint, ignore the rest
-
-  # merge desired parts
-  HP.p <- gUnaryUnion(HP.p[-1,])
-
-  output <- gUnion(local.drainage.p, HP.p)
   dr_ar <- area(output) *1e-6
 
-  # transform and calculate drainage area
-
+  # clean geometry with a zero-width buffer
+  output <- gBuffer(output, byid=TRUE, width=0)
+  
+  # Calculate non-contributing areas
+  if (!missing(NCA)){
+    NCA <- InterpretShapefile(NCA)
+    if (NCA@proj4string@projargs != projected.CRS){
+    NCA <- sp::spTransform(NCA, sp::CRS(projected.CRS))
+    }
+     clipped <- gDifference(output, NCA)
+     drainage.effective <- round(area(clipped)) * 1e-6
+    print("take out non-contributing area") # take out non-contributing area
+  }else{
+    drainage.effective <- NA
+  }
+  
   # create attribute table
   data <- as.data.frame(list(  # make output table
     stn_number=station@data$station_number,
@@ -340,7 +389,8 @@ StationPolygon <- function(station, con, outdir, HYBAS, DEM, saga.env, NCA, inte
     stn_dr_ef=station@data$drainage_area_effect
   ))
 
-   output <- SpatialPolygonsDataFrame(output, data)
+   output <-  sp::spTransform(SpatialPolygonsDataFrame(output, data), # output shape file with same CRS as station
+                              CRSobj = sp::CRS(station@proj4string@projargs)) 
 
   # write output shapefile (rgdal::writeOGR)
   name <- paste(station$station_number, "_basin.shp")

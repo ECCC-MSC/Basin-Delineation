@@ -1,4 +1,4 @@
-#con <- dbConnect(RSQLite::SQLite(), "M:\\trasnfer\\Hydat_august\\Hydat.sqlite3") 
+#con <- dbConnect(RSQLite::SQLite(), "M:\\trasnfer\\Hydat_august\\Hydat.sqlite3")
 
 #' Length of Longitudinal Degree
 #'
@@ -26,7 +26,7 @@ LongitudeLength <- function(lat, lat.m, lat.s){
 }
 
 #' Which UTM Zone am I in?
-#' 
+#'
 #' @description Determines UTM zone from longitude
 #' @param long numeric longitude in decimal degrees
 #' @return integer UTM zone number
@@ -58,7 +58,7 @@ read.pt2 <- function(x){
   names(out) <- names.attributes
 
   ## Note that some things are stored as factors and they get screwed up during read-in. Correct this:
-  # this gets a little ugly...  
+  # this gets a little ugly...
 
   # format text strings
   which.factors <- grepl(pattern = '.* oneof', data.types)
@@ -119,7 +119,7 @@ bool.check <- function(vec){
 }
 
 #' HydroSHEDS DEM index
-#' 
+#'
 #' @description returns the name of a HYDROSHEDS tiled data file name based on the coordinates of a point
 #' @param long numeric longitude
 #' @param lat numeric latitude
@@ -136,18 +136,18 @@ HydroTile <- function(long, lat, fext=''){
 }
 
 #' HydroMosaic
-#' 
+#'
 #' @description Finds all HydroSHEDS DEM tiles within a specified tolerance of a point.  To be used
 #' with 3 arc-second hydrologically conditioned DEM.
 #' @param tol Tolerance in m to consider
 #' @return A vector of grid names to load
 #' @keywords internal
 #' @export
-HydroMosaic <- function(long, lat, tol, ...){ 
+HydroMosaic <- function(long, lat, tol, ...){
   tol <- tol * 0.001 # convert to km
   LL <- LongitudeLength(lat)
   grids <- HydroTile(long, lat, ...)
-  
+
   # check all sides for proximity, add grids if necessary
   if ((lat - floor(lat / 5) * 5) * 111 < tol){ # too close to bottom
     grids <- c(grids, HydroTile(long, lat - 5, ...))
@@ -163,7 +163,7 @@ HydroMosaic <- function(long, lat, tol, ...){
 }
 
 #' Get Mosaic Extent
-#' 
+#'
 #' @param names names of mosaic file
 GetMosaicLimits <- function(names){
   names <- gsub("_con.*", "", names)
@@ -174,12 +174,12 @@ GetMosaicLimits <- function(names){
 }
 
 #' Read SAGA Grid header
-#' 
+#'
 #' @description get info for SAGA grid
-#' @param file character string path to *.sgrd 
+#' @param file character string path to *.sgrd
 #' @return data frame with list of grid parameters
 #' @export
-#' @keywords internal 
+#' @keywords internal
 read.sgrd.header <- function(file){
   # get .sgrd grid info from ascii header
   data <- read.table(file, sep=c('='), strip.white = T, stringsAsFactors = F)
@@ -194,11 +194,11 @@ read.sgrd.header <- function(file){
 #' @description A helper function to easily produce proj4 strings without introducting global variables
 #' and without cluttering the main body of the code with long proj4 strings.
 #' @param x character string of a
-#' @details 
+#' @details
 GetProj4 <- function(x){
   return(
     switch(x,
-      "WGS84"="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs", 
+      "WGS84"="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs",
       "AlbersEqualAreaConic"="+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs"
     )
   )
@@ -226,4 +226,50 @@ GetTilePathsHS <- function(names, DEM.dir){
   original.DEM <- unlist(lapply(names, list.files, path=DEM.dir, full.names = T, recursive = T, include.dirs = T))
   original.DEM <- original.DEM[basename(original.DEM)==basename(dirname(original.DEM))]
   return(original.DEM)
+}
+
+
+TileIndex <- function(geom1, tile, tilename){
+  # read-in tile if filename is provided
+  tile <- InterpretShapefile(tile)
+  # check CRS, transform if necessary
+  geom1 <- SameCRS(geom1,tile)
+  # get intersecting tile iDs
+  tiles <- over(geom1, tile, returnList = T)[[1]]
+  tiles <- tiles[,tilename]
+  return(as.character(tiles))
+}
+
+
+#' @description Checks whether or not objects have the same spatial reference.  If not, one of them
+#' is transformed to match the other.
+#' @param spgeom1 Spatial object that will be evaluated and transformed if necessary
+#' @param spgeom2 Spatial object that will not be transformed
+SameCRS <- function(spgeom1, spgeom2){
+  if (spgeom1@proj4string@projargs != spgeom2@proj4string@projargs){
+    spgeom1 <- sp::spTransform(spgeom1, CRSobj = CRS(spgeom2@proj4string@projargs))
+  }
+  return(spgeom1)
+}
+
+#' @description allows for shapefiles to be passed as character strings or as R spatial objects in other functions
+#' @param x either an R spatial object or a character string specifying a shapefile path
+InterpretShapefile <- function(x){
+  if (class(x)=="character"){
+    x <- rgdal::readOGR(x)
+  }
+  if (grepl("Spatial", class(x))){
+    return(x)
+  }else{
+    stop("Could not interpret shapefile")
+  }
+}
+
+ExpandBBox <- function(geom1, tol){
+  geom1 <- sp::spTransform(geom1, GetProj4("WGS84"))
+  box <- sp::bbox(geom1)
+  dlat <- (tol * 1e-3) / 111
+  dlon <- (tol * 1e-3) / LongitudeLength(mean(box["latitude",]))
+  box.new <- box + c(-dlon, -dlat, dlon, dlat)
+  return(box.new)
 }

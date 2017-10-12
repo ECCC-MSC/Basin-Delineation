@@ -11,15 +11,17 @@
 #' @param iterate.incr numeric, by how much should the buffer be grown each iteration (ignored if iterate.to is equal to pointbuffer)
 #' @param iterate.thres numeric, how many square kilometers difference between the calculated area and
 #' initial point buffer should be required to trigger another iteration (ignored if iterate.to is equal to pointbuffer)
-#' @param in.DEM Either a directory containing HydroSHEDS DEM files of the format n%%w0%%_con_grid.sgrd,
-#'  or a file path to such a DEM.  The DEM should be in a projected coordinate system and the coordinate
+#' @param DEM.path One of:
+#'  (1) a file path to a directory containing DEM files either in the the format n%%w0%%_con_grid.sgrd (if DEM.source is 'SHEDS')
+#'  or a directory to which NTS files will be downloaded (if DEM.source='NTS'),
+#'  (2) a file path to a dem file in SAGA format.  The DEM should be in a projected coordinate system and the coordinate
 #'  system should match that of the point (e.g. Canada Albers Conformal Conic)
 #' @param dem.clip.square How big (in m) a clip should be generated from the original DEM (too big doesn't work and is slower)
 #' @param projected.CRS character vector (proj4) specifying "working" CRS in which area and distance calculations are to be done
 #' @param ... optional arguments including 'verbose' (toggles SAGA console output)
 #' @return Character string naming the recently created polygon
 #' @export
-UpslopeDEM <- function(point, in.DEM, saga.env, outdir, pointbuffer=150, dem.clip.square=50000,
+UpslopeDEM <- function(point, DEM.path, DEM.source='NTS', saga.env, outdir, pointbuffer=150, dem.clip.square=50000,
                        projected.CRS, iterate.to=150, iterate.incr=50, iterate.thres=0.4, ...){
 
   #sanity checks
@@ -27,7 +29,7 @@ UpslopeDEM <- function(point, in.DEM, saga.env, outdir, pointbuffer=150, dem.cli
     projected.CRS <- GetProj4("AlbersEqualAreaConic")
   }
   iterate.to <- max(c(iterate.to, pointbuffer))
-  in.DEM <- gsub("\\.sdat$", "\\.sgrd", in.DEM)
+  in.DEM <- gsub("\\.sdat$", "\\.sgrd", DEM.path)
 
   # prepare workspace
   oldwd <- getwd()
@@ -46,20 +48,28 @@ UpslopeDEM <- function(point, in.DEM, saga.env, outdir, pointbuffer=150, dem.cli
 
   # Find missing DEM if necessary / Convert to sgrd if necessary.
   if (!grepl("\\.sgrd$", in.DEM)){  # if not an SGRD file (then we expect a directory or a list of names)
-    name <- HydroMosaic(point@data$longitude, point@data$latitude, tol=dem.clip.square)
-    if (length(name)==1){
-      check.if.exists <- list.files(in.DEM, pattern=paste(name, ".sgrd", sep=''), full.names = T, recursive = T)
-      if (length(check.if.exists) ==0){  #  if sgrid doesn't exist, create it
+
+    if (grepl('sheds',tolower(DEM.source))){
+      name <- HydroMosaic(point@data$longitude, point@data$latitude, tol=dem.clip.square)
+      if (length(name)==1){
+        check.if.exists <- list.files(in.DEM, pattern=paste(name, ".sgrd", sep=''), full.names = T, recursive = T)
+        if (length(check.if.exists) ==0){  #  if sgrid doesn't exist, create it
+          original.DEM <- GetTilePathsHS(name, in.DEM)
+          print(sprintf("Converting %s DEM to sgrd...", original.DEM))
+          gdal_warp2SAGA(original.DEM, outputCRS = projected.CRS)
+        }
+        in.DEM <- list.files(in.DEM, pattern=paste(name,".sgrd$", sep=''), full.names = T, recursive = T)
+        print(sprintf("Using %s as input DEM", in.DEM))
+
+      }else if (length(name) > 1){ # need to mosaic and transform
+        print('Multiple grids Necessary...')
         original.DEM <- GetTilePathsHS(name, in.DEM)
-        print(sprintf("Converting %s DEM to sgrd...", original.DEM))
-        gdal_warp2SAGA(original.DEM, outputCRS = projected.CRS)
+        in.DEM <- MosaicAndWarp(gridnames = name, DEM.path = in.DEM, saga.env = saga.env, outputCRS = projected.CRS)
       }
-      in.DEM <- list.files(in.DEM, pattern=paste(name,".sgrd$", sep=''), full.names = T, recursive = T)
-      print(sprintf("Using %s as input DEM", in.DEM))
-    }else if (length(name) > 1){ # need to mosaic and transform
-      print('Multiple grids Necessary...')
-      original.DEM <- GetTilePathsHS(name, in.DEM)
-      in.DEM <- MosaicAndWarp(gridnames = name, DEM.path = in.DEM, saga.env = saga.env, outputCRS = projected.CRS)
+
+      }else if (grepl('nts',tolower(DEM.source))){
+      in.DEM <- OverlayNTS(point, NTS.dir=DEM.path, output.dir=saga.env$workspace, tol=dem.clip.square) # clip from DEM
+      dem.clip.square <- 0
     }else{
       print("Could not find suitable DEM in folder")
       return()
@@ -67,12 +77,12 @@ UpslopeDEM <- function(point, in.DEM, saga.env, outdir, pointbuffer=150, dem.cli
   }
 
   # Clip grid to point
-  if (dem.clip.square>0){
+  if (dem.clip.square > 0){
   ClipGridRS(point, in.DEM, 'clipped.sgrd', saga.env, tol=dem.clip.square, ...)
   }
 
   # Fill Sinks
-  FillSinksRS(ifelse(dem.clip.square>0,'clipped.sgrd',in.DEM),
+  FillSinksRS(ifelse((dem.clip.square > 0),'clipped.sgrd',in.DEM),
               'filled.sgrd', saga.env, MINSLOPE=0.01, ...)
 
 
@@ -253,7 +263,7 @@ UpslopeAreaRS <- function(in.DEM, target.grid, out.GRD, saga.env, verbose=F){
     TARGET=target.grid,
     ELEVATION=in.DEM,
     AREA=out.GRD,
-    METHOD=0 # The Deterministic Eight (also something I don't know enough about yet...)
+    METHOD=0 # The Deterministic Eight 
   ))
 }
 

@@ -65,8 +65,8 @@ DownloadAndUnzip <- function(url, destfile, exdir){
 
 #' Wrapper for single download
 DownloadMultipleNTS <- function(NTS, NTS.dir, force.50k=F, product){
-  if (!all(grepl("^\\d{3}[[:alpha:]]{2}(\\d{2})?$"),NTS)){
-    stop("Bad format for NTS string")
+  if (!all(grepl("^\\d{3}[[:alpha:]](\\d{2})?$", NTS))){
+    stop("Bad format for one or more NTS strings")
   }
   if (force.50k & product!='CDEM'){
     NTS <- unlist(lapply(NTS, function(x) paste(x, sprintf("%02d", seq(1,16)), sep='')))
@@ -86,12 +86,27 @@ DownloadMultipleNTS <- function(NTS, NTS.dir, force.50k=F, product){
 #' @param product character, which DEM product to use.  One of ('CDED', 'CDEM')
 #' @example
 #' CompileNTS("035D", "C:/temp", "C:/temp", "C:/temp/NTSmosaic.sdat", force.50k=T)
-CompileNTS <- function(NTS, NTS.dir, output.dir, dstfile, force.50k=F, product='CDED'){
-  files <- DownloadMultipleNTS(NTS, NTS.dir=NTS.dir, force.50k=force.50k, product=product)
+CompileNTS <- function(NTS, NTS.dir, output.dir, force.50k=F, product='CDED'){
+  files <- DownloadMultipleNTS(NTS=NTS, NTS.dir=NTS.dir, force.50k=force.50k, product=product)
+  dstfile <- file.path(output.dir, "NTS_mosaic.sdat")
   gdal_mosaic(srcfiles = files, dstfile = dstfile, of = "SAGA",srcnodata = -32767 )
-
-  gdal_warp2SAGA(dstfile, srcnodata=-32768,
+  output <- gdal_warp2SAGA(dstfile, srcnodata=-32768,
                  outputCRS="+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")
-  return(dstfile)
+  file.remove(dstfile)
+  return(output)
 }
 
+OverlayNTS <- function(geom1, tile, NTS.dir, output.dir, tilename="NTS_SNRC", tol, ...){
+  # get NTS index
+  if (!missing(tol)){  # use geometry points
+    tile.names <- unlist(lapply(nts(bbox=ExpandBBox(geom1, tol)), paste, collapse=''))
+  }else if (!missing(tile)){               # use tile index
+    tile.names <- TileIndex(geom1, tile, tilename)
+  }
+
+  # build and mosaic
+  grid <- CompileNTS(NTS=tile.names, NTS.dir=NTS.dir, output.dir=output.dir, ...)
+
+  # return grid name
+  return(grid)
+  }
