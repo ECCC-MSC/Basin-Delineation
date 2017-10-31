@@ -247,7 +247,7 @@ TileIndex <- function(geom1, tile, tilename){
 #' @param spgeom2 Spatial object that will not be transformed
 SameCRS <- function(spgeom1, spgeom2){
   if (spgeom1@proj4string@projargs != spgeom2@proj4string@projargs){
-    spgeom1 <- sp::spTransform(spgeom1, CRSobj = CRS(spgeom2@proj4string@projargs))
+    spgeom1 <- sp::spTransform(spgeom1, CRSobj = sp::CRS(spgeom2@proj4string@projargs))
   }
   return(spgeom1)
 }
@@ -257,6 +257,7 @@ SameCRS <- function(spgeom1, spgeom2){
 InterpretShapefile <- function(x){
   if (class(x)=="character"){
     x <- rgdal::readOGR(x)
+    return(x)
   }
   if (grepl("Spatial", class(x))){
     return(x)
@@ -265,6 +266,9 @@ InterpretShapefile <- function(x){
   }
 }
 
+#' @description
+#' @param geom1 R spatial object
+#' @param tol numeric, distance in kilometers to
 ExpandBBox <- function(geom1, tol){
   geom1 <- sp::spTransform(geom1, GetProj4("WGS84"))
   box <- sp::bbox(geom1)
@@ -272,4 +276,18 @@ ExpandBBox <- function(geom1, tol){
   dlon <- (tol * 1e-3) / LongitudeLength(mean(box["latitude",]))
   box.new <- box + c(-dlon, -dlat, dlon, dlat)
   return(box.new)
+}
+
+
+#' @description moves a point to the nearest point on a line
+#' @param point spatialPointsDataFrame
+#' @param lines spatialLinesDataFrame or spatialLines
+#' @return a spatial point with the same data as the input point, but on one of the lines in lines.
+#' @export
+#' @keywords internal
+SnapToNearest <- function(point, lines){
+  point <- SameCRS(point, lines) # put them in same CRS
+  n <- rgeos::gNearestPoints(point, lines)[2]  #first element is original point
+  pointNew <- SpatialPointsDataFrame(coords=n@coords, data=point@data, proj4string = point@proj4string)
+  return(pointNew)
 }

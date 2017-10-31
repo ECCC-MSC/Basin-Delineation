@@ -1,3 +1,5 @@
+# USGS national grid
+# 1 arc-sec https://prd-tnm.s3.amazonaws.com/index.html?prefix=StagedProducts/Elevation/1/ArcGrid/ (covers canada too!)
 
 
 

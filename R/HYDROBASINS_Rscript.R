@@ -261,10 +261,11 @@ FindNearestRiverSegment <- function(spatialPoint, riverLines, HYBAS){
 #' @param DEM either
 #' @param outdir (optional) A directory to which the output shapefile and report will be saved.  If not specified,
 #' the function will return an R object without saving data to disk.
+#' @param pourpoints spatial points data frame with
 #' @param NCA (optional) Either a character string path or a SpatialPolygonsDataFrame.  This is a polygon
 #' of the non-contributing areas.  If provided, calculates effective drainage area
 #' @return A SpatialPolygonDataFrame
-StationPolygon <- function(station, con, outdir, HYBAS, DEM.path, DEM.source, saga.env, NCA, interactive=F,
+StationPolygon <- function(station, con, outdir, HYBAS, DEM.path, DEM.source, saga.env, NCA, interactive=F,pourpoints,
                            projected.CRS="+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs", ...){
 
   # Figure out what "station" is and read it in
@@ -279,40 +280,51 @@ StationPolygon <- function(station, con, outdir, HYBAS, DEM.path, DEM.source, sa
   }else{
     print("could not read 'station' information")
   }
-
+  print(station$station_number)
+  if (!missing(pourpoints)){
+    station <- getPourPoint(station, pourpoints)
+  }
   #=============
   # Calculations
   #=============
-  
+
   # Get upslope area from HYBAS
   HYB.Poly.individual <- UpstreamHYBAS(station, HYBAS)
   HYB.Poly <- rgeos::gUnaryUnion(HYB.Poly.individual, id=HYB.Poly.individual$ID) # combined area
   no.upstream.hyb <- (length(HYB.Poly.individual) == 1)
-  
+
   # Get first two upstream tiles (should be the first one for each ID)
   first.up <- unlist(by(data = HYB.Poly.individual@data, INDICES = HYB.Poly.individual@data$ID,
                      FUN = function(x) as.character(x[which.max(as.character(x$UP_AREA)),c("HYBAS_ID")])))
   first.up.HYB <- HYB.Poly.individual[HYB.Poly.individual$HYBAS_ID %in% first.up & HYB.Poly.individual$ENDO != 2,]
   first.up.HYB.endo <- HYB.Poly.individual[HYB.Poly.individual$HYBAS_ID %in% first.up,]
-  
-  
+
+
   # find any endorheic basins
   endo.HYB <- HYB.Poly.individual@data[HYB.Poly.individual$HYBAS_ID %in% first.up & HYB.Poly.individual$ENDO == 2,"ID"]
   ID.list <- sapply(slot(HYB.Poly, "polygons"), function(x) slot(x, "ID"))
   endo <- ID.list %in% endo.HYB
-  
+
   disjoint <- rep(F, length(endo))
   not.unlikely <- rep(F, length(endo))
-  
+
   # find necessary coverage for DEM
-  
-  DEM.path <- OverlayNTS(gUnaryUnion(first.up.HYB), 
+
+  DEM.path <- OverlayNTS(gUnaryUnion(first.up.HYB),
                          NTS50k, saga.env$workspace, saga.env$workspace,
                          tilename="NTS_SNRC")
 
   # Get upslope area from DEM
-  DEM.Poly <- UpslopeDEM(station, DEM.path = DEM.path, saga.env = saga.env,
+  DEMresult <- UpslopeDEM(station, DEM.path = DEM.path, saga.env = saga.env,
                          outdir = saga.env$workspace, projected.CRS=projected.CRS, ...)
+  if (DEMresult$nodata==T){ # if the point has no data
+    DEM.poly.p <- sp::spTransform(HYB.Poly, CRS = sp::CRS(projected.CRS)) #use different CRS?
+  }
+  DEM.Poly <- DEMresult$final.name
+  pointbuffer <- DEMresult$pointbuffer
+  iterate.to <- DEMresult$iterate.to
+  iterate.thres <- DEMresult$iterate.thres
+
   DEM.Poly.p <- invisible(rgdal::readOGR(DEM.Poly))
   DEM.Poly.p <- DEM.Poly.p[which.max(area(DEM.Poly.p)),] # take the big one.  others will likely have bad geometries
 
@@ -326,38 +338,24 @@ StationPolygon <- function(station, con, outdir, HYBAS, DEM.path, DEM.source, sa
   #  Logical Steps
   #=====================
 
-  # dr.ar <- station@data[1,"drainage_area_gross"]
-  # if (!is.na(dr.ar) &dr.ar <= 100 & dr.ar > 0) {
-  #   print("Using local basin")
-  # }
-# 
-#   if (interactive){
-#     plot(HP.p)
-#     polygonsLabel(HP.p, labels=row.names(HP.p), method='centroid')
-#     plot(local.drainage.p, col='red', add=T)
-#     readline("Which polygons to keep?")
-#   }
-  
   if (!no.upstream.hyb){
     # if DEM is disjoint with upslope area, do not include it.
     disjoint <- gDisjoint(HP.p, local.drainage.p, byid = T)
-    
+
     # if calculated total upslope area is less than half of an upslope HYBAS region, remove that HYBAS region
     not.unlikely <- area(DEM.Poly.p) > 0.5*area(sp::spTransform(first.up.HYB.endo, CRS(DEM.Poly.p@proj4string@projargs)))
-    # regions.to.keep <- first.up.HYB@data[not.unlikely, "ID"] #remove first one (containing polygon)
-    # regions.to.keep <- regions.to.keep[regions.to.keep %in% sapply(HP.p@polygons, slot, name='ID') & 
-    #                                      regions.to.keep != "A"]
-    #HP.p <- HP.p[regions.to.keep,]
   }
-  
+
   keep <- ID.list[(!disjoint | endo) & (not.unlikely | endo)]
   keep <- keep[-which(keep=="A")]
-  HP.p <- HP.p[keep,]
-  
+  HP.out <- HP.p[keep,]
+
   # merge desired parts of HYBAS polygons with local drainage
-  if (length(HP.p) > 0 & !no.upstream.hyb){
-    HP.p <- gUnaryUnion(HP.p)
-    output <- gUnion(local.drainage.p, HP.p)
+  if (pointbuffer >= iterate.to){
+    output <- gUnaryUnion(HP.p)
+  }else if (length(HP.out) > 0 & !no.upstream.hyb){
+    HP.p <- gUnaryUnion(HP.out)
+    output <- gUnion(local.drainage.p, HP.out)
   }else{
     output <- gUnaryUnion(local.drainage.p)
   }
@@ -366,7 +364,7 @@ StationPolygon <- function(station, con, outdir, HYBAS, DEM.path, DEM.source, sa
 
   # clean geometry with a zero-width buffer
   output <- gBuffer(output, byid=TRUE, width=0)
-  
+
   # Calculate non-contributing areas
   if (!missing(NCA)){
     NCA <- InterpretShapefile(NCA)
@@ -379,18 +377,23 @@ StationPolygon <- function(station, con, outdir, HYBAS, DEM.path, DEM.source, sa
   }else{
     drainage.effective <- NA
   }
-  
+
   # create attribute table
   data <- as.data.frame(list(  # make output table
     stn_number=station@data$station_number,
     drainar_gr=dr_ar,
     drainar_ef=drainage.effective,  # add notes?
     stn_dr_gr=station@data$drainage_area_gross,
-    stn_dr_ef=station@data$drainage_area_effect
+    stn_dr_ef=station@data$drainage_area_effect,
+    trgtRdius=pointbuffer,
+    trgtRdMax=iterate.to,
+    iterThres=iterate.thres,
+    snapped=DEMresult$snapped,
+    snap.dist=DEMresult$snap.dist
   ))
 
    output <-  sp::spTransform(SpatialPolygonsDataFrame(output, data), # output shape file with same CRS as station
-                              CRSobj = sp::CRS(station@proj4string@projargs)) 
+                              CRSobj = sp::CRS(station@proj4string@projargs))
 
   # write output shapefile (rgdal::writeOGR)
   name <- paste(station$station_number, "_basin.shp")
@@ -399,6 +402,10 @@ StationPolygon <- function(station, con, outdir, HYBAS, DEM.path, DEM.source, sa
   # write output table (optional?)
   tablename <- paste(station$station_number, "_basin.csv")
   write.csv(output@data, file.path(outdir, tablename), row.names=F)
+
+  #clean up (optional?)
+  file.remove(DEM.Poly)
+
   return(list(hyb = HP.p, dem = local.drainage.p, out=output))
 }
 
@@ -410,4 +417,17 @@ StationPolygon <- function(station, con, outdir, HYBAS, DEM.path, DEM.source, sa
 #' @param flow.accu flow accumulation raster
 UpstreamBasin <- function(point, flow.direction, flow.accu){
 return(NULL)
+}
+
+# get pour point
+getPourPoint <- function(point, pourpoint){
+  if (point@data$station_number %in% pourpoint@data$station_number) {
+    pp <- pourpoint[pourpoint@data$station_number == point@data$station_number, "station_number"]
+    pp@data <- merge(pp@data, point@data)
+    print('Using pour point coordinate')
+    return(pp)
+  }else{
+    print('no matching pour point found!')
+    return(point)
+  }
 }

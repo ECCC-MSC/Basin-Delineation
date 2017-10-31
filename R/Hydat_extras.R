@@ -7,7 +7,7 @@
 #' @return A SpatialPointsDataFrame for the Hydat stations
 #' @export
 SpatialHydat <- function(con, ...){
-  # con <- dbConnect(RSQLite::SQLite(), "path to hydat sqlite database") 
+  # con <- dbConnect(RSQLite::SQLite(), "path to hydat sqlite database")
   Hyd <- HYDAT::StationMetadata(con, ...)
   coord <- Hyd[,c("longitude","latitude")]
   #Hyd <- Hyd[,-which(names(a) %in% c("longitude", "latitude"))]
@@ -54,19 +54,19 @@ SpatialECDE <- function(data.file, data.format){
     input[] <- lapply(input, bool.check)
   }
   input[,sapply(input, class)=="factor"] <- lapply(input[,sapply(input, class)=="factor"], as.character)
-  
+
   # Change names so that they match HYDAT.  (specifically what is returned by hydat R package)
   names(input) <- tolower(names(input))  # Hydat R package has lowercase convention
   names(input) <- sub("^station$", "station_number", names(input))
-  names(input) <- sub("^stationname$", "station_name", names(input))  
-  names(input) <- sub("^hydstatus$", "hyd_status", names(input)) 
-  names(input) <- sub("^prov$", "prov_terr_state_loc", names(input)) 
-  names(input) <- sub("^drainagearea$", "drainage_area_gross", names(input))  
-  names(input) <- sub("^prov$", "prov_terr_state_loc", names(input)) 
-  names(input) <- sub("^region$", "regional_office", names(input)) 
-  names(input) <- sub("^sed$", "sed_status", names(input)) 
+  names(input) <- sub("^stationname$", "station_name", names(input))
+  names(input) <- sub("^hydstatus$", "hyd_status", names(input))
+  names(input) <- sub("^prov$", "prov_terr_state_loc", names(input))
+  names(input) <- sub("^drainagearea$", "drainage_area_gross", names(input))
+  names(input) <- sub("^prov$", "prov_terr_state_loc", names(input))
+  names(input) <- sub("^region$", "regional_office", names(input))
+  names(input) <- sub("^sed$", "sed_status", names(input))
   names(input) <- sub("^realtime$", "real_time", names(input))
-  
+
   coord <- input[,c("longitude","latitude")]
   output <- sp::SpatialPointsDataFrame(coords = coord, data=input, proj4string = sp::CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0") )
   return(output)
