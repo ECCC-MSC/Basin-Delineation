@@ -36,87 +36,6 @@ WhichZone <- function(long){
   return(zone)
 }
 
-#' Read *.pt2
-#'
-#' @title Read in a pt2 file from EC Data explorer output table
-#' @description  Read in a pt2 file from EC Data explorer output table. Does some type
-#' conversion to make the output the same as the read.tb0 and read.dbf functions for ECDE
-#' @param x  pt2 file from EC Data explorer export
-#' @return A data.frame with (hopefully) appropriate data types
-#' @export
-read.pt2 <- function(x){
-  # read in header information
-  n.attributes <- read.table(x, skip = 15, nrows = 1)[1,2]
-  names.attributes <- readLines(x, n= n.attributes*2+16)[17:(n.attributes*2+16)]
-  data.types <- names.attributes[seq(2,length(names.attributes),2)]
-  names.attributes <- names.attributes[seq(1,length(names.attributes),2)]
-  names.attributes <- matrix(unlist(strsplit(names.attributes,' ')), ncol=3, byrow = T)[,3]
-
-  # read in data
-  out <- read.table(x, skip=n.attributes*2+16+2, stringsAsFactors = F)
-  out <- out[,-c(1,2)]
-  names(out) <- names.attributes
-
-  ## Note that some things are stored as factors and they get screwed up during read-in. Correct this:
-  # this gets a little ugly...
-
-  # format text strings
-  which.factors <- grepl(pattern = '.* oneof', data.types)
-  factor.defs <- gsub("^.* oneof ", '', data.types[which.factors])
-  factor.defs <- gsub("\" \"", ',', factor.defs)
-  factor.defs <- gsub("[\"]", "", factor.defs)
-  factor.defs <- gsub("^ ", "", factor.defs)
-
-  # break up text strings
-  factor.defs <- strsplit(factor.defs, ',')
-  factor.defs <- lapply(factor.defs, strsplit, split='=')
-  names(factor.defs) <- names(out)[which.factors]
-
-  # replace digit indices with factors for each factor variable, then convert to character
-  for (i in seq(1,length(data.types))){
-    if (which.factors[i] == TRUE){
-      df <- matrix((unlist(factor.defs[names(out)[i]])), ncol=2, byrow = T)
-      replacement = factor(out[,i], levels = df[,2], labels = df[,1])
-      out[,i] <- replacement
-    }
-  }
-  return(out)
-}
-
-#' Read *.tb0
-#'
-#' @title Read in a tb0 file from EC Data explorer output table
-#' @description  Read in a tb0 file from EC Data explorer output table. Does some type
-#' conversion to make the output the same as the read.pt2 and read.dbf functions for ECDE
-#' @param x  tb0 file from EC Data explorer export
-#' @return A data.frame with (hopefully) appropriate data types
-#' @export
-read.tb0 <- function(x){
-  colnam <- read.table(x, skip = 26, nrows = 1, stringsAsFactors = F)
-  colnam <- colnam[1,-1]
-  data.cols <- read.table(x, skip = 33, stringsAsFactors = F)
-  names(data.cols) <- colnam
-  out <- data.cols
-  return(out)
-}
-
-#'  Convert to Boolean
-#'
-#' @title Create a SpatialPointsDataFrame from ECDE table export.
-#' @description  Changes vectors into Boolean when appropriate
-#' @param vec  A vector (any type)
-#' @return the original unchanged vector, or if possible a boolean
-#' @keywords internal
-#' @export
-bool.check <- function(vec){
-  if (class(vec) == "character") {
-    vec.uniq <- trimws(tolower(unique(vec)))
-    if (("true" %in% vec.uniq | "false" %in% vec.uniq) & (length(vec.uniq) <=2)){
-      vec <- as.logical(trimws(vec))
-    }
-  }
-  vec
-}
 
 #' HydroSHEDS DEM index
 #'
@@ -195,7 +114,6 @@ read.sgrd.header <- function(file){
 #' @description A helper function to easily produce proj4 strings without introducting global variables
 #' and without cluttering the main body of the code with long proj4 strings.
 #' @param x character string of a
-#' @details
 GetProj4 <- function(x){
   return(
     switch(x,
@@ -235,10 +153,17 @@ GetTilePathsHS <- function(names, DEM.dir){
   return(original.DEM)
 }
 
-
-TileIndex <- function(geom1, tile, tilename){
+#' Get NTS Tile index
+#' @description Find all NTS tiles that intersect a spatial object
+#' @param geom1 An R Spatial* object
+#' @param tileindex either an R SpatialPolygonsDataFrame of the NTS tile index, or a character
+#' path pointing to such a shapefile
+#' @param tilename Name of column in tileindex that gives NTS sheet number
+#' @export
+#' @keywords internal
+TileIndex <- function(geom1, tileindex, tilename){
   # read-in tile if filename is provided
-  tile <- InterpretShapefile(tile)
+  tile <- InterpretShapefile(tileindex)
   # check CRS, transform if necessary
   geom1 <- SameCRS(geom1,tile)
   # get intersecting tile iDs
@@ -253,6 +178,7 @@ TileIndex <- function(geom1, tile, tilename){
 #' is transformed to match the other.
 #' @param spgeom1 Spatial* object that will be evaluated and transformed if necessary
 #' @param spgeom2 Spatial* object that will not be transformed
+#' @export
 SameCRS <- function(spgeom1, spgeom2){
   if (spgeom1@proj4string@projargs != spgeom2@proj4string@projargs){
     spgeom1 <- sp::spTransform(spgeom1, CRSobj = sp::CRS(spgeom2@proj4string@projargs))
@@ -262,8 +188,11 @@ SameCRS <- function(spgeom1, spgeom2){
 
 #' Shapefile Helper
 #'
-#' @description allows for shapefiles to be passed as character strings or as R spatial objects in other functions
+#' @description allows for shapefiles to be passed as character strings or
+#' as R spatial objects in other functions
 #' @param x either an R spatial object or a character string specifying a shapefile path
+#' @export
+#' @keywords internal
 InterpretShapefile <- function(x){
   if (class(x)=="character"){
     x <- rgdal::readOGR(x)
@@ -276,7 +205,7 @@ InterpretShapefile <- function(x){
   }
 }
 
-#' Bounding box buffer
+#' Expand Bounding box
 #'
 #' @description Increases the size of a bounding box by a specified
 #' @param geom1 an R Spatial* object
@@ -284,6 +213,8 @@ InterpretShapefile <- function(x){
 #' @return a bounding box R object
 #' @details This is used with \code{link[rcanvec]{nts.bbox}} in order to get all NTS tiles that
 #' are within the buffer distance of the object
+#' @export
+#' @keywords internal
 ExpandBBox <- function(geom1, tol){
   geom1 <- sp::spTransform(geom1, GetProj4("WGS84"))
   box <- sp::bbox(geom1)
@@ -293,7 +224,7 @@ ExpandBBox <- function(geom1, tol){
   return(box.new)
 }
 
-
+#' Snap point to nearest line
 #' @description moves a point to the nearest point on a line
 #' @param point spatialPointsDataFrame
 #' @param lines spatialLinesDataFrame or spatialLines

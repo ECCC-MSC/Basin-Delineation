@@ -2,9 +2,11 @@
 # 1 arc-sec https://prd-tnm.s3.amazonaws.com/index.html?prefix=StagedProducts/Elevation/1/ArcGrid/ (covers canada too!)
 
 
-
+#' Get URL of CDED NTS tile
 #' @param NTS character NTS string in format DDDLDD or DDDL (d=digit, L=letter) e.g 075M05 or 014K
 #' @return character path to CDED DEM tile for selected NTS sheet
+#' @export
+#' @keywords internal
 CDEDGetTilePath <- function(NTS){
   NTS <- tolower(NTS)
   resolution <- switch(as.character(nchar(NTS)), '6'='50k_dem', '4'='250k_dem')
@@ -14,8 +16,11 @@ CDEDGetTilePath <- function(NTS){
   return(FTP.path)
 }
 
+#' Get URL of CDEM NTS tile
 #' @param NTS character NTS string in format DDDLDD or DDDL (d=digit, L=letter) e.g 075M05 or 014K
 #' @return character path to CDED DEM tile for selected NTS sheet
+#' @export
+#' @keywords internal
 CDEMGetTilePath <- function(NTS){
   NTS <- toupper(NTS)
   basepath <- "http://ftp.geogratis.gc.ca/pub/nrcan_rncan/elevation/cdem_mnec"
@@ -24,9 +29,18 @@ CDEMGetTilePath <- function(NTS){
   return(FTP.path)
 }
 
-
-#' @param NTS name of NTS tile
-#' @description downloads and unzips DEM tiles to a directory
+#' Download NTS Sheet
+#' @param NTS character string, name of NTS tile (e.g. '075C' or '014D03'). If specified as
+#' a 250k tile (4 characters), a 250k tile will be downloaded. If specified as a 50k tile (6 character)
+#' then a 50k tile will be downloaded.
+#' @param NTS.dir character string, path to directory where NTS tiles are stored. This function creates a nested
+#' file hierarchy that matches that of the FTP site
+#' @param replace logical, degaults to FALSE, whether or not files should be re-downloaded if they already exist
+#' in the NTS.dir directory
+#' @param product either 'CDEM' or 'CDED', which data product to get
+#' @description downloads DEM tiles from "http://ftp.geogratis.gc.ca/pub/nrcan_rncan/elevation" and unzips
+#' them to a directory
+#' @export
 DownloadSingleNTS <-  function(NTS, NTS.dir, replace=F, product='CDED'){
   output <- T
   FTP.path <- switch(product, 'CDED'=CDEDGetTilePath(NTS), 'CDEM'=CDEMGetTilePath(NTS))
@@ -47,6 +61,8 @@ DownloadSingleNTS <-  function(NTS, NTS.dir, replace=F, product='CDED'){
   }}
 
 
+#' Download and Unzip NTS
+#' @description a subroutine of \link{DownloadSingleNTS}
 DownloadAndUnzip <- function(url, destfile, exdir){
   output <- tryCatch(
     {
@@ -65,8 +81,18 @@ DownloadAndUnzip <- function(url, destfile, exdir){
     })
 }
 
-#' Wrapper for single download
-DownloadMultipleNTS <- function(NTS, NTS.dir, force.50k=F, product){
+#' Download Multiple NTS
+#' @description a wrapper for \link{DownloadSingleNTS} that allows a vector of NTS sheets to be specified
+#' @param NTS character string, name of NTS tile (e.g. '075C' or '014D03'). If specified as
+#' a 250k tile (4 characters), a 250k tile will be downloaded. If specified as a 50k tile (6 character)
+#' then a 50k tile will be downloaded.
+#' @param NTS.dir character string, path to directory where NTS tiles are stored. This function creates a nested
+#' file hierarchy that matches that of the FTP site.
+#' @param force.50k logical, returns 50k tiles instead of 250k tiles even if the tiles are specified as 250k tiles.
+#' e.g. using "075C" would use 075C01, 075C02, 075C03 and so on.
+#' @param product either 'CDEM' or 'CDED'. Which dataset to download
+#' @export
+DownloadMultipleNTS <- function(NTS, NTS.dir, force.50k=F, product='CDED'){
   if (!all(grepl("^\\d{3}[[:alpha:]](\\d{2})?$", NTS))){
     stop("Bad format for one or more NTS strings")
   }
@@ -78,16 +104,24 @@ DownloadMultipleNTS <- function(NTS, NTS.dir, force.50k=F, product){
   return(files)
 }
 
-#' @description
-#' @param NTS
-#' @param NTS.dir
-#' @param output.dir
-#' @param dstfile
+#' CompileNTS
+#'
+#' @description Downloads a set of NTS tiles and moasaicks them into one SAGA grid file.
+#' @param NTS character string, name of NTS tile (e.g. '075C' or '014D03'). If specified as
+#' a 250k tile (4 characters), a 250k tile will be downloaded. If specified as a 50k tile (6 character)
+#' then a 50k tile will be downloaded.
+#' @param NTS.dir character string, path to directory where NTS tiles are stored. This function creates a nested
+#' file hierarchy that matches that of the FTP site.
+#' @param output.dir character string specifying where output file should be saved
 #' @param force.50k logical, returns 50k tiles instead of 250k tiles even if the tiles are specified as 250k tiles.
 #' e.g. using "075C" would use 075C01, 075C02, 075C03 and so on.
 #' @param product character, which DEM product to use.  One of ('CDED', 'CDEM')
-#' @example
+#' @return name of output DEM
+#' @examples
+#' \dontrun{
 #' CompileNTS("035D", "C:/temp", "C:/temp", "C:/temp/NTSmosaic.sdat", force.50k=T)
+#' }
+#' @export
 CompileNTS <- function(NTS, NTS.dir, output.dir, force.50k=F, product='CDED'){
   files <- DownloadMultipleNTS(NTS=NTS, NTS.dir=NTS.dir, force.50k=force.50k, product=product)
   dstfile <- file.path(output.dir, "NTS_mosaic.sdat")
@@ -98,12 +132,26 @@ CompileNTS <- function(NTS, NTS.dir, output.dir, force.50k=F, product='CDED'){
   return(output)
 }
 
-OverlayNTS <- function(geom1, tile, NTS.dir, output.dir, tilename="NTS_SNRC", tol, ...){
+#' OverlayNTS
+#' @description Covers a shape with an NTS grid
+#' @param geom1 An R Spatial* object to be 'buffered' with the DEM
+#' @param tileindex spatialpointspolygon of NTS tile index or path to shapefile of tile index
+#' @param NTS.dir directory where NTS tiles are stored
+#' @param output.dir where output DEM should be saved
+#' @param tilename Name of column in tileindex that gives NTS sheet number
+#' @param tol (optional) by how many metres to buffer geom1
+#' @param ... optional arguments passed to \link{CompileNTS}
+#' @details Builds a DEM from CDED that either extends a fixed distance on either
+#' side of a spatialobject (if a tol(erace) is specified) or intersects the NTS index (if
+#' tileindex is specified)
+#' @return name of output DEM
+#' @export
+OverlayNTS <- function(geom1, tileindex, NTS.dir, output.dir, tilename="NTS_SNRC", tol, ...){
   # get NTS index
   if (!missing(tol)){  # use geometry points
-    tile.names <- unlist(lapply(nts(bbox=ExpandBBox(geom1, tol)), paste, collapse=''))
-  }else if (!missing(tile)){               # use tile index
-    tile.names <- TileIndex(geom1, tile, tilename)
+    tile.names <- unlist(lapply(rcanvec::nts(bbox=ExpandBBox(geom1, tol)), paste, collapse=''))
+  }else if (!missing(tileindex)){               # use tile index
+    tile.names <- TileIndex(geom1, tileindex, tilename)
   }
 
   # build and mosaic

@@ -264,7 +264,7 @@ FindNearestRiverSegment <- function(spatialPoint, riverLines, HYBAS){
 #' @param pourpoints spatial points data frame with
 #' @param NCA (optional) Either a character string path or a SpatialPolygonsDataFrame.  This is a polygon
 #' of the non-contributing areas.  If provided, calculates effective drainage area
-#' @return A SpatialPolygonDataFrame
+#' @return A list of SpatialPolygonDataFrames
 StationPolygon <- function(station, con, outdir, HYBAS, DEM.path, DEM.source, saga.env, NCA, interactive=F,pourpoints,
                            projected.CRS="+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs", ...){
 
@@ -409,15 +409,6 @@ StationPolygon <- function(station, con, outdir, HYBAS, DEM.path, DEM.source, sa
   return(list(hyb = HP.p, dem = local.drainage.p, out=output))
 }
 
-#' Upstream Area
-#'
-#' @description Finds basin area from raster flow direction and accumulation maps
-#' @param point spatial point or polygon
-#' @param flow.direction
-#' @param flow.accu flow accumulation raster
-UpstreamBasin <- function(point, flow.direction, flow.accu){
-return(NULL)
-}
 
 # get pour point
 getPourPoint <- function(point, pourpoint){

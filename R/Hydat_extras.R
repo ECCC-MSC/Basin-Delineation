@@ -82,3 +82,85 @@ SpatialECDE <- function(data.file, data.format){
   return(output)
 }
 
+
+#' Read *.pt2
+#'
+#' @title Read in a pt2 file from EC Data explorer output table
+#' @description  Read in a pt2 file from EC Data explorer output table. Does some type
+#' conversion to make the output the same as the read.tb0 and read.dbf functions for ECDE
+#' @param x  pt2 file from EC Data explorer export
+#' @return A data.frame with (hopefully) appropriate data types
+#' @export
+read.pt2 <- function(x){
+  # read in header information
+  n.attributes <- read.table(x, skip = 15, nrows = 1)[1,2]
+  names.attributes <- readLines(x, n= n.attributes*2+16)[17:(n.attributes*2+16)]
+  data.types <- names.attributes[seq(2,length(names.attributes),2)]
+  names.attributes <- names.attributes[seq(1,length(names.attributes),2)]
+  names.attributes <- matrix(unlist(strsplit(names.attributes,' ')), ncol=3, byrow = T)[,3]
+
+  # read in data
+  out <- read.table(x, skip=n.attributes*2+16+2, stringsAsFactors = F)
+  out <- out[,-c(1,2)]
+  names(out) <- names.attributes
+
+  ## Note that some things are stored as factors and they get screwed up during read-in. Correct this:
+  # this gets a little ugly...
+
+  # format text strings
+  which.factors <- grepl(pattern = '.* oneof', data.types)
+  factor.defs <- gsub("^.* oneof ", '', data.types[which.factors])
+  factor.defs <- gsub("\" \"", ',', factor.defs)
+  factor.defs <- gsub("[\"]", "", factor.defs)
+  factor.defs <- gsub("^ ", "", factor.defs)
+
+  # break up text strings
+  factor.defs <- strsplit(factor.defs, ',')
+  factor.defs <- lapply(factor.defs, strsplit, split='=')
+  names(factor.defs) <- names(out)[which.factors]
+
+  # replace digit indices with factors for each factor variable, then convert to character
+  for (i in seq(1,length(data.types))){
+    if (which.factors[i] == TRUE){
+      df <- matrix((unlist(factor.defs[names(out)[i]])), ncol=2, byrow = T)
+      replacement = factor(out[,i], levels = df[,2], labels = df[,1])
+      out[,i] <- replacement
+    }
+  }
+  return(out)
+}
+
+#' Read *.tb0
+#'
+#' @title Read in a tb0 file from EC Data explorer output table
+#' @description  Read in a tb0 file from EC Data explorer output table. Does some type
+#' conversion to make the output the same as the read.pt2 and read.dbf functions for ECDE
+#' @param x  tb0 file from EC Data explorer export
+#' @return A data.frame with (hopefully) appropriate data types
+#' @export
+read.tb0 <- function(x){
+  colnam <- read.table(x, skip = 26, nrows = 1, stringsAsFactors = F)
+  colnam <- colnam[1,-1]
+  data.cols <- read.table(x, skip = 33, stringsAsFactors = F)
+  names(data.cols) <- colnam
+  out <- data.cols
+  return(out)
+}
+
+#'  Convert to Boolean
+#'
+#' @title Create a SpatialPointsDataFrame from ECDE table export.
+#' @description  Changes vectors into Boolean when appropriate
+#' @param vec  A vector (any type)
+#' @return the original unchanged vector, or if possible a boolean
+#' @keywords internal
+#' @export
+bool.check <- function(vec){
+  if (class(vec) == "character") {
+    vec.uniq <- trimws(tolower(unique(vec)))
+    if (("true" %in% vec.uniq | "false" %in% vec.uniq) & (length(vec.uniq) <=2)){
+      vec <- as.logical(trimws(vec))
+    }
+  }
+  vec
+}

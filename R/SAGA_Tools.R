@@ -25,13 +25,13 @@
 #'  system should match that of the point (e.g. Canada Albers Conformal Conic)
 #' @param dem.clip.square How big (in m) a clip should be generated from the original DEM (too big doesn't work and is slower)
 #' @param projected.CRS character vector (proj4) specifying "working" CRS in which area and distance calculations are to be done
-#' @param ... optional arguments including 'verbose' (toggles SAGA console output)
+#' @param ... optional arguments to \link[RSAGA]{rsaga.geoprocessor} including 'verbose' (toggles SAGA console output)
 #' @param method character, one of ('D8', 'DINF'), specifying the hydrological pathing model
 #' @param upstream.threshold integer, number of upstream cells required to initiate channel growth.
 #' A smaller number will yield more channels and will snap to smaller streams. Larger numbers will produce
 #' only major channel branches. For a 50k DEM, numbers between 20,000 and 50,000 are appropriate to reproduce the
 #' main channel network without many small branches.
-#' @return Character string naming the recently created polygon
+#' @return A list containing diagnostic information and and a character string naming the recently created upstream area polygon
 #' @export
 UpslopeDEM <- function(point, DEM.path, DEM.source='NTS', saga.env, outdir, pointbuffer=50, dem.clip.square=50000,
                        projected.CRS, iterate.to=150, iterate.incr=50, iterate.thres=0.4, method="D8", upstream.threshold=35000, ...){
@@ -156,8 +156,9 @@ run <- TRUE
               nodata=nodata, snapped=snapped, snap.dist=snap.dist))
 }
 
-
-#' @description
+#' Snap to pour point
+#' @description Finds the nearest location on a stream segment to a hydrological station and returns the pourpoint
+#' as a spatialpointsdataframe with the same attributes as the input station.
 #' @param station spatialpointsdataframe representing a hydrological station
 #' @param in.DEM character path pointing to hydrologically conditioned DEM. Must be in projected
 #' coordinate system and, at a minimum, have filled sinks.
@@ -488,7 +489,7 @@ MosaicAndWarp <- function(gridnames, DEM.path, saga.env, inputCRS="+proj=longlat
   inputs <- paste(temp.hdrs.path, collapse=';')
   mosaicked <- file.path(saga.env$workspace, "temp_mosaicked.sdat")
   MoisaicRS(inputs, mosaicked, saga.env=saga.env, xmin=minx, xmax=maxx, ymin=miny, ymax=maxy, cellsize=cellsize)
-warped.output <-  file.path(saga.env$workspace, "temp_mosaicked_warped.sdat")
+  warped.output <-  file.path(saga.env$workspace, "temp_mosaicked_warped.sdat")
   gdal_warp2SAGA(mosaicked, warped.output, outputCRS = outputCRS)
   return(warped.output)
 }
@@ -555,7 +556,7 @@ FlowAccumulationRS <- function(in.DEM, out_grid, saga.env, verbose=F){
 #' and returns the grid values.
 #' @param point either SpatialPoints* or character path to points used to intersect grid. Must have same CRS as the grid
 #' @param grid grid whose values will be sampled
-#' @param saga.env
+#' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #' @return vector of grid values the same length as the number of points
 #' @export
 #' @keywords internal
@@ -566,7 +567,7 @@ SampleRasterRS <- function(point, grid, saga.env, verbose=F){
     point <- file.path(saga.env$workspace, "station.shp")
   }
   sampled <- gsub("\\.shp", "_gridsample\\.shp", point)
-  rsaga.geoprocessor(lib='shapes_grid', module=0, env=saga.env, show.output.on.console = verbose,
+  RSAGA::rsaga.geoprocessor(lib='shapes_grid', module=0, env=saga.env, show.output.on.console = verbose,
                      check.module.exists = FALSE,
                      param=list(
                        SHAPES=point,
