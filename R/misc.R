@@ -67,7 +67,7 @@ read.pt2 <- function(x){
   factor.defs <- gsub("[\"]", "", factor.defs)
   factor.defs <- gsub("^ ", "", factor.defs)
 
-  # break up text  strings
+  # break up text strings
   factor.defs <- strsplit(factor.defs, ',')
   factor.defs <- lapply(factor.defs, strsplit, split='=')
   names(factor.defs) <- names(out)[which.factors]
@@ -190,7 +190,8 @@ read.sgrd.header <- function(file){
 }
 
 
-## Coordinate systems
+#' Coordinate systems
+#'
 #' @description A helper function to easily produce proj4 strings without introducting global variables
 #' and without cluttering the main body of the code with long proj4 strings.
 #' @param x character string of a
@@ -204,7 +205,13 @@ GetProj4 <- function(x){
   )
 }
 
-## Hybas to stationprefix
+#'#' Hybas to stationprefix
+#'
+#' @description For a station prefix, returns the first 3 digits of the pfaffstetter code corresponding
+#' to the nearest hydrobasins polygon. This allows the hydrobasins file to be subset using indexing before
+#' running through searches by removing polygons that are neither upstream nor downstream of the station
+#' @param station character string specifying a station name e.g. "02AB001"
+#' @keywords internal
 NearestHYBAS <- function(station){
   code = regmatches(x =station ,m = regexpr("^\\d{2}", station))
   basins <- switch(code,
@@ -240,11 +247,12 @@ TileIndex <- function(geom1, tile, tilename){
   return(as.character(tiles))
 }
 
-
-#' @description Checks whether or not objects have the same spatial reference.  If not, one of them
+#' Check for same CRS between Spatial* objects
+#'
+#' @description Checks whether or not two objects have the same spatial reference.  If not, one of them
 #' is transformed to match the other.
-#' @param spgeom1 Spatial object that will be evaluated and transformed if necessary
-#' @param spgeom2 Spatial object that will not be transformed
+#' @param spgeom1 Spatial* object that will be evaluated and transformed if necessary
+#' @param spgeom2 Spatial* object that will not be transformed
 SameCRS <- function(spgeom1, spgeom2){
   if (spgeom1@proj4string@projargs != spgeom2@proj4string@projargs){
     spgeom1 <- sp::spTransform(spgeom1, CRSobj = sp::CRS(spgeom2@proj4string@projargs))
@@ -252,6 +260,8 @@ SameCRS <- function(spgeom1, spgeom2){
   return(spgeom1)
 }
 
+#' Shapefile Helper
+#'
 #' @description allows for shapefiles to be passed as character strings or as R spatial objects in other functions
 #' @param x either an R spatial object or a character string specifying a shapefile path
 InterpretShapefile <- function(x){
@@ -266,9 +276,14 @@ InterpretShapefile <- function(x){
   }
 }
 
-#' @description
-#' @param geom1 R spatial object
-#' @param tol numeric, distance in kilometers to
+#' Bounding box buffer
+#'
+#' @description Increases the size of a bounding box by a specified
+#' @param geom1 an R Spatial* object
+#' @param tol numeric, distance in kilometers to buffer
+#' @return a bounding box R object
+#' @details This is used with \code{link[rcanvec]{nts.bbox}} in order to get all NTS tiles that
+#' are within the buffer distance of the object
 ExpandBBox <- function(geom1, tol){
   geom1 <- sp::spTransform(geom1, GetProj4("WGS84"))
   box <- sp::bbox(geom1)

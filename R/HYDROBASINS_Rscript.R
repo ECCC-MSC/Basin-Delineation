@@ -404,7 +404,7 @@ StationPolygon <- function(station, con, outdir, HYBAS, DEM.path, DEM.source, sa
   write.csv(output@data, file.path(outdir, tablename), row.names=F)
 
   #clean up (optional?)
-  file.remove(DEM.Poly)
+ # file.remove(DEM.Poly)
 
   return(list(hyb = HP.p, dem = local.drainage.p, out=output))
 }

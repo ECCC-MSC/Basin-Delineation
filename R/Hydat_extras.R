@@ -2,15 +2,25 @@
 #'
 #' @title Create a SpatialPointsDataFrame from a Hydat database connection.
 #' @description  Create a SpatialPointsDataFrame from the "STATIONS" Hydat table.
-#' @param con  An open SQLite database connection to the HYDAT database
+#' @param con  An open SQLite database connection to the HYDAT database or a character string pointing to
+#' a SQLite database
 #' @param ...  Optional character vector of stations to subset (passed to HYDAT::StationMetaData))
 #' @return A SpatialPointsDataFrame for the Hydat stations
 #' @export
 SpatialHydat <- function(con, ...){
-  # con <- dbConnect(RSQLite::SQLite(), "path to hydat sqlite database")
+  if (class(con)=="character"){
+    if (!requireNamespace("RSQLite")){
+      print("Missing library: 'RSQLite'. Please install library")
+      return()
+    }
+    con <- RSQLite::dbConnect(RSQLite::SQLite(), con)
+    }
+  if (!requireNamespace("HYDAT")){
+    print("Missing library: 'HYDAT'. Please install library")
+    return()
+    }
   Hyd <- HYDAT::StationMetadata(con, ...)
   coord <- Hyd[,c("longitude","latitude")]
-  #Hyd <- Hyd[,-which(names(a) %in% c("longitude", "latitude"))]
   output <- sp::SpatialPointsDataFrame(coords = coord, data=Hyd, proj4string = sp::CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0") )
   return(output)
 }

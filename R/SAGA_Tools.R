@@ -452,6 +452,10 @@ gdal_mosaic <- function(srcfiles, dstfile, srcnodata=-32768, dstnodata, of="SAGA
   return(dstfile)
 }
 
+
+#' Mosaic and warp raster
+#'
+#' @description combines some grids and changes coordinate system
 #' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #' @param outputCRS character vector specifying EPSG for coordinate system to output
 #' @keywords internal
@@ -489,7 +493,9 @@ warped.output <-  file.path(saga.env$workspace, "temp_mosaicked_warped.sdat")
   return(warped.output)
 }
 
-#' @description Builds a channel network.
+#' Build channel network using RSAGA
+#'
+#' @description Builds a channel network from a DEM.
 #' @param in.DEM character string pointing to the *.sgrd path of a (hydrologically appropriate) DEM
 #' @param init.grid (optional) character string pointing to a flow accumulation *.sgrd file.  If not
 #' supplied, it will be created.
@@ -500,6 +506,8 @@ warped.output <-  file.path(saga.env$workspace, "temp_mosaicked_warped.sdat")
 #' main channel network without many small branches.
 #' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #' character string  Mosaic 'grid_tools' module 3
+#' @return character string path to channel network shapefile
+#' @export
 ChannelNetworkRS <- function(in.DEM, init.grid, out.shape, upstream.threshold=35000, saga.env, verbose=F){
   print("Building Channel Network...")
   if (missing(init.grid)){
@@ -519,10 +527,14 @@ ChannelNetworkRS <- function(in.DEM, init.grid, out.shape, upstream.threshold=35
   return(out.shape)
 }
 
+#' Flow Accumulation using RSAGA
+#'
 #' @description Calculates flow accumulation
 #' @param in.DEM character string pointing to the *.sgrd path of a (hydrologically appropriate) DEM
 #' @param output_grid character string pointing to the *.sgrd path of the output file
 #' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
+#' @return path to output flow accumulation grid
+#' @export
 FlowAccumulationRS <- function(in.DEM, out_grid, saga.env, verbose=F){
   if (missing(out_grid)) out_grid <- gsub("\\.sgrd", "_flowacc\\.sgrd", in.DEM)
   print("Calculating Flow Accumulation...")
@@ -534,8 +546,13 @@ FlowAccumulationRS <- function(in.DEM, out_grid, saga.env, verbose=F){
                               METHOD=0     # deterministic 8
                             ))
   return(out_grid)
-  }
+}
 
+
+#' Measure raster at point using RSAGA
+#'
+#' @description Spatial Join: Retrieves information from the selected grid at the positions of the points
+#' and returns the grid values.
 #' @param point either SpatialPoints* or character path to points used to intersect grid. Must have same CRS as the grid
 #' @param grid grid whose values will be sampled
 #' @param saga.env
@@ -550,6 +567,7 @@ SampleRasterRS <- function(point, grid, saga.env, verbose=F){
   }
   sampled <- gsub("\\.shp", "_gridsample\\.shp", point)
   rsaga.geoprocessor(lib='shapes_grid', module=0, env=saga.env, show.output.on.console = verbose,
+                     check.module.exists = FALSE,
                      param=list(
                        SHAPES=point,
                        GRIDS=grid,
