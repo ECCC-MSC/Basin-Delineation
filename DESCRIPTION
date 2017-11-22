@@ -1,10 +1,15 @@
 Package: HydroTool
 Title: Finds upstream area and upstream stations
-Version: 0.1.1
+Version: 0.1.1.04
 Authors@R: person("Nick", "Brown", email = "nicholas.brown3@canada.ca", role = c("aut", "cre"))
 Description: Provides functions to delineate drainage areas for hydrometric stations using the HydroSHEDS and HydroBASINS data products.
   Also contains functions for loading into R data exported from ECCC data explorer.
-Depends: R (>= 3.4.0)
+Depends: 
+    R (>= 3.2.0),
+    RSAGA,
+    rgdal,
+    sp,
+    RSQLite
 License: None
 Encoding: UTF-8
 LazyData: true
@@ -15,12 +20,7 @@ Imports:
     maptools,
     gdalUtils,
     rcanvec
-Depends:
-    RSAGA,
-    rgdal,
-    sp,
-    RSQLite
 Suggests:
     HYDAT,
-    foreign
+    foreign    
 RoxygenNote: 6.0.1

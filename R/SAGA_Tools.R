@@ -1,11 +1,11 @@
-#' troubleshooting RSAGA:
-#' - run command in commandline
-#' - sometimes the variables names are different between versions of SAGA, (e.g. INTERPOL instead of RESAMPLING)
+# troubleshooting RSAGA:
+# - run command in commandline
+# - sometimes the variables names are different between versions of SAGA, (e.g. INTERPOL instead of RESAMPLING)
 
 
 
 
-#' Upslope polygon
+#' Calculate upslope polygon from DEM
 #'
 #' @description Create a drainage basin shapefile using a DEM and a 'pour point'.  The polygon is
 #' @param point a SpatialPointsDataFrame corresponding to a hydrometric station.  Must be in same coordinates system as DEM and coordinate system
@@ -18,9 +18,10 @@
 #' @param iterate.incr numeric, by how much should the buffer be grown each iteration (ignored if iterate.to is equal to pointbuffer)
 #' @param iterate.thres numeric, how many square kilometers difference between the calculated area and
 #' initial point buffer should be required to trigger another iteration (ignored if iterate.to is equal to pointbuffer)
+#' @param DEM.source character, one of: c('CDED', 'NED', 'CDEM, CDSM', 'SHEDS'). Ignored if a DEM file is supplied to DEM.path
 #' @param DEM.path One of:
 #'  (1) a file path to a directory containing DEM files either in the the format n%%w0%%_con_grid.sgrd (if DEM.source is 'SHEDS')
-#'  or a directory to which NTS files will be downloaded (if DEM.source='NTS'),
+#'  or a directory to which DEM tiles will be downloaded (if DEM.source='NTS', 'CDED' etc.),
 #'  (2) a file path to a dem file in SAGA format.  The DEM should be in a projected coordinate system and the coordinate
 #'  system should match that of the point (e.g. Canada Albers Conformal Conic)
 #' @param dem.clip.square How big (in m) a clip should be generated from the original DEM (too big doesn't work and is slower)
@@ -66,7 +67,7 @@ UpslopeDEM <- function(point, DEM.path, DEM.source='NTS', saga.env, outdir, poin
   # Find missing DEM if necessary / Convert to sgrd if necessary.
   if (!grepl("\\.sgrd$", in.DEM)){  # if not an SGRD file (then we expect a directory or a list of names)
 
-    if (grepl('sheds',tolower(DEM.source))){
+    if (tolower(DEM.source)=='sheds'){
       name <- HydroMosaic(point@data$longitude, point@data$latitude, tol=dem.clip.square)
       if (length(name)==1){
         check.if.exists <- list.files(in.DEM, pattern=paste(name, ".sgrd", sep=''), full.names = T, recursive = T)
@@ -84,8 +85,11 @@ UpslopeDEM <- function(point, DEM.path, DEM.source='NTS', saga.env, outdir, poin
         in.DEM <- MosaicAndWarp(gridnames = name, DEM.path = in.DEM, saga.env = saga.env, outputCRS = projected.CRS)
       }
 
-      }else if (grepl('nts',tolower(DEM.source))){
-      in.DEM <- OverlayNTS(point, NTS.dir=DEM.path, output.dir=saga.env$workspace, tol=dem.clip.square) # clip from DEM
+      }else if (toupper(DEM.source) %in% c('CDED','NED', 'CDEM', 'CDSM')){
+      print(DEM.source) #debug only
+        in.DEM <- OverlayDEM(point, DEM.dir=DEM.path, output.dir=saga.env$workspace,
+                           product = DEM.source, tol=dem.clip.square) # clip from DEM
+
       dem.clip.square <- 0
     }else{
       print("Could not find suitable DEM in folder")
@@ -93,14 +97,18 @@ UpslopeDEM <- function(point, DEM.path, DEM.source='NTS', saga.env, outdir, poin
     }
   }
 
-  # If point is outside of raster limits (e.g. in USA)
+  # Test if point is outside of raster limits (e.g. in USA)
   value <- SampleRasterRS(point = point, grid = in.DEM, saga.env=saga.env )
+
   nodata <- F
   if (is.na(value)){
-   nodata <- T
-   setwd(oldwd)
-   return(list(final.name=NA, pointbuffer=NA, iterate.thres=iterate.thres, iterate.to=iterate.to,
-               nodata=nodata, snapped=F, snapped=snapped, snap.dist=NA))
+    print("station outside of CDED coverage, switching to ")
+    in.DEM <- OverlayDEM(point, DEM.dir=DEM.path, output.dir=saga.env$workspace,
+                         product = 'NED', tol=dem.clip.square)
+   # nodata <- T
+   # setwd(oldwd)
+   # return(list(final.name=NA, pointbuffer=NA, iterate.thres=iterate.thres, iterate.to=iterate.to,
+   #             nodata=nodata, snapped=F, snapped=snapped, snap.dist=NA))
   }
 
   # Clip grid to point
@@ -270,7 +278,6 @@ ClipPolygonRS <- function(input, clipping.layer, output, saga.env,verbose=F){
 #' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #' @param MINSLOPE minimum slope to maintain between cells
 #' @param XXL logical, whether or not to use the 'Fill sinks XXL' tool, suitable for large grids
-#' @keywords internal
 #' @export
 FillSinksRS <- function(in.DEM, out.DEM, saga.env, MINSLOPE=0.01, verbose=F, XXL=F){
   print("Filling sinks...")
@@ -323,7 +330,6 @@ BreachDepressionsRS <- function(in.DEM, out.DEM, saga.env, METHOD=0, THRESHOLD=0
 #' @param target.grid saga grid
 #' @param out.GRD character string path to output grid
 #' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
-#' @keywords internal
 #' @export
 UpslopeAreaRS <- function(in.DEM, target.grid, out.GRD, saga.env, verbose=F, method=1){
   print("Calculating upstream area...")
@@ -344,7 +350,6 @@ UpslopeAreaRS <- function(in.DEM, target.grid, out.GRD, saga.env, verbose=F, met
 #' @param out.poly character string path to output polygon shapefile
 #' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #' @param CLASS_ID numeric raster value that designates which grid cells to convert to polygon (cells with other values will be ignored)
-#' @keywords internal
 #' @export
 Grid2PolyRS <- function(in.GRD, out.poly, saga.env, CLASS_ID=100, verbose=F){
   print("Converting grid to polygons...")
@@ -559,7 +564,6 @@ FlowAccumulationRS <- function(in.DEM, out_grid, saga.env, verbose=F){
 #' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #' @return vector of grid values the same length as the number of points
 #' @export
-#' @keywords internal
 SampleRasterRS <- function(point, grid, saga.env, verbose=F){
   print("Sampling raster...")
   if (grepl("Spatial", class(point))){

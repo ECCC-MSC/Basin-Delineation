@@ -1,6 +1,6 @@
 #con <- dbConnect(RSQLite::SQLite(), "M:\\trasnfer\\Hydat_august\\Hydat.sqlite3")
 
-#' Length of Longitudinal Degree
+#' Calculate Length of Longitudinal Degree
 #'
 #' @description  Calculates the length of one degree of longitude at a given latitude
 #' @param lat  numeric vector - northing of location (degrees or decimal degrees)
@@ -25,10 +25,11 @@ LongitudeLength <- function(lat, lat.m, lat.s){
   return(lon.km)
 }
 
-#' Which UTM Zone am I in?
+#' Calculate UTM zone from longitude
 #'
 #' @description Determines UTM zone from longitude
 #' @param long numeric longitude in decimal degrees
+#' @details (floor((long + 180)/6) %% 60) + 1
 #' @return integer UTM zone number
 #' @export
 WhichZone <- function(long){
@@ -37,7 +38,7 @@ WhichZone <- function(long){
 }
 
 
-#' HydroSHEDS DEM index
+#' Get index of HydroSHEDS DEM tile
 #'
 #' @description returns the name of a HYDROSHEDS tiled data file name based on the coordinates of a point
 #' @param long numeric longitude
@@ -54,7 +55,7 @@ HydroTile <- function(long, lat, fext=''){
   return(out)
 }
 
-#' HydroMosaic
+#' Find all hydroSHEDS tiles within a distance of a point
 #'
 #' @description Finds all HydroSHEDS DEM tiles within a specified tolerance of a point.  To be used
 #' with 3 arc-second hydrologically conditioned DEM.
@@ -109,11 +110,18 @@ read.sgrd.header <- function(file){
 }
 
 
-#' Coordinate systems
+#' Proj4 string from abbreviation
 #'
 #' @description A helper function to easily produce proj4 strings without introducting global variables
 #' and without cluttering the main body of the code with long proj4 strings.
-#' @param x character string of a
+#' @param x character string of a coordinate system. See options in details below
+#' @return proj4 string corresponding to x
+#' @keywords internal
+#' @details
+#'  "WGS84" = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs",
+#'  "AlbersEqualAreaConic" = "+proj=aea +lat_1=50 +lat_2=70 +lat_0=40
+#'  +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs"
+#'  ... more to come
 GetProj4 <- function(x){
   return(
     switch(x,
@@ -153,26 +161,26 @@ GetTilePathsHS <- function(names, DEM.dir){
   return(original.DEM)
 }
 
-#' Get NTS Tile index
-#' @description Find all NTS tiles that intersect a spatial object
+#' Get names of DEM tiles that overlap object
+#' @description Find all DEM tiles that intersect a spatial object
 #' @param geom1 An R Spatial* object
-#' @param tileindex either an R SpatialPolygonsDataFrame of the NTS tile index, or a character
+#' @param tileindex either an R SpatialPolygonsDataFrame of the DEM tile index, or a character
 #' path pointing to such a shapefile
-#' @param tilename Name of column in tileindex that gives NTS sheet number
+#' @param tile.id.field Name of column in tileindex that gives DEM sheet number
 #' @export
 #' @keywords internal
-TileIndex <- function(geom1, tileindex, tilename){
+TileIndex <- function(geom1, tileindex, tile.id.field){
   # read-in tile if filename is provided
   tile <- InterpretShapefile(tileindex)
   # check CRS, transform if necessary
   geom1 <- SameCRS(geom1,tile)
   # get intersecting tile iDs
   tiles <- over(geom1, tile, returnList = T)[[1]]
-  tiles <- tiles[,tilename]
+  tiles <- tiles[,tile.id.field]
   return(as.character(tiles))
 }
 
-#' Check for same CRS between Spatial* objects
+#' Ensure that two Spatial* objects have the same CRS
 #'
 #' @description Checks whether or not two objects have the same spatial reference.  If not, one of them
 #' is transformed to match the other.
@@ -219,7 +227,8 @@ ExpandBBox <- function(geom1, tol){
   geom1 <- sp::spTransform(geom1, GetProj4("WGS84"))
   box <- sp::bbox(geom1)
   dlat <- (tol * 1e-3) / 111
-  dlon <- (tol * 1e-3) / LongitudeLength(mean(box["latitude",]))
+  dlon <- (tol * 1e-3) / LongitudeLength(mean(box[2,]))
+  if (!(all(0 < abs(box[2,])) & all(abs(box[2,]) < 90))){stop()}
   box.new <- box + c(-dlon, -dlat, dlon, dlat)
   return(box.new)
 }
@@ -236,4 +245,56 @@ SnapToNearest <- function(point, lines){
   n <- rgeos::gNearestPoints(point, lines)[2]  #first element is original point
   pointNew <- SpatialPointsDataFrame(coords=n@coords, data=point@data, proj4string = point@proj4string)
   return(pointNew)
+}
+
+#' Create SpatialPointsDataFrame from csv
+#'
+#' @description Creates an R SpatialPointsDataFrame from a csv or
+#' @param file path to *.csv file
+#' @param headerX character, column name containing x coordinate information
+#' @param headerY character, column name containing y coordinate information
+#' @param CRS (optional) character, proj4 string specifying the projection information of the points. If missing,
+#' the default is WGS84
+#' @return SpatialPointsDataFrame
+#' @export
+SpatialCSV <- function(file, headerX, headerY, CRS){
+  if (missing(CRS)){
+    CRS <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+  }
+  CRS <- sp::CRS(CRS)
+  file.data <- read.csv(file)
+  coords <- file.data[,c(headerX, headerY)]
+  output <- SpatialPointsDataFrame(coords, data=file.data, proj4string = CRS)
+  return(output)
+}
+
+
+#' Find degree-graticule tiles within distance
+#'
+GraticuleIndices <- function(long, lat, tol, resolution=1, ...){
+  tol <- tol * 0.001 # convert to km
+  LL <- LongitudeLength(lat)
+  dlat <- tol/111  #convert to degree
+  dlon <- tol/LL   #convert to degree
+
+  xrange <- c(long-dlon, long+dlon)
+  xrange <- floor(xrange/resolution)*resolution
+  xrange <- seq(min(xrange), max(xrange), resolution)
+  yrange <- c(lat-dlat, lat+dlat)
+  yrange <- ceiling(yrange/resolution)*resolution
+  yrange <- seq(min(yrange), max(yrange), resolution)
+
+  out <- expand.grid(xrange, yrange)
+  return(out)
+}
+
+#only works with points, and only works with lat/lon
+NEDcoverage <- function(geom1, tol, ...){
+  if (grepl("units=m", geom1@proj4string@projargs)){
+    geom1 <- sp::spTransform(geom1,
+                                CRSobj = sp::CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
+  }
+  coords <- gCentroid(geom1)@coords[1,]
+  ind <- GraticuleIndices(coords[1], coords[2], tol=tol, ...)
+  apply(ind, 1, function(x) USGSTileName(x[1], x[2]))
 }

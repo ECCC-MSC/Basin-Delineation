@@ -10,7 +10,7 @@
 #' @return A list containing a spatial object and an attribute table
 #' @examples
 #'  LoadHybas("C:\\Data\\HydroBASINS", 'ar', 3)
-#'  @export
+#' @export
 LoadHybas <- function(path, area='na', level=7){
   if(!file.exists(path)){
   print("File does not exist")
@@ -35,15 +35,15 @@ LoadHybas <- function(path, area='na', level=7){
 
 #' Find Nearest Upstream Sub-Basins
 #'
-#'@description  For a sub-basin with a given HYBAS.ID, find all sub-basins that are directly upstream (adjacent)
-#'uses tables as given from LoadHybas
-#'@param HYBAS: a HYBAS spatial polygon object
-#'@param HYBAS.ID: The HYBAS.ID of the sub-basin from which to go upstream
-#'@param ignore.endorheic Whether or not to ignore 'virtual' inputs from inland basins. defaults to FALSE.
-#'@examples
+#' @description  For a sub-basin with a given HYBAS.ID, find all sub-basins that are directly upstream (adjacent)
+#' uses tables as given from LoadHybas
+#' @param HYBAS: a HYBAS spatial polygon object
+#' @param HYBAS.ID: The HYBAS.ID of the sub-basin from which to go upstream
+#' @param ignore.endorheic Whether or not to ignore 'virtual' inputs from inland basins. defaults to FALSE.
+#' @examples
 #' HB <- LoadHybas("C:\\Data\\HydroBASINS", 'ar', 3)
 #' FindUpstreamSubBasins(HB, "")
-#'@export
+#' @export
 FindUpstreamSubBasins <- function(HYBAS, HYBAS.ID, ignore.endorheic=F){
   upstream.ab <- HYBAS@data[HYBAS@data$NEXT_DOWN == HYBAS.ID,c("HYBAS_ID", "ENDO")] # returns as char
   if (ignore.endorheic){
@@ -103,78 +103,13 @@ FindUpstreamStations <- function(HYBAS, HYBAS.ID, con, all=T, ...){
 }
 
 
-plot.subset.HYBAS <- function(HYBAS, HYBAS.ID, text=T){
-  ## Plots one or more HYBAS polygons
-  subset <- HYBAS[HYBAS$HYBAS_ID %in% HYBAS.ID,]
-  plot(subset)
-  if (text)invisible(text(getSpPPolygonsLabptSlots(subset), labels=as.character(subset$HYBAS_ID), cex=0.7))
-}
-
-#' Upstream Basin
-#'
-#' @description Return the upstream basin polygon for a station
-#' @param x either a hybas ID or a HYDAT station ID
-#' @param include.first whether or not to include the enclosing hybas polygon (overestimation)
-#' @param ignore.endorheic logical, whether or not to include 'virtual connections' in the HydroSHEDS topology
-#' @return a spatial polygon data frame of the upstream basin
-upstream.basin <- function(station, HYBAS, include.first=T, ignore.endorheic=F){
-  station <-NA
-  st.ar.gr <- NA
-  st.ar.ef <- NA
-  if (is.character(x) | is.factor(x)){
-    if (grepl('\\d{10}', x)) HYBAS.ID <- as.character(x)
-    if (grepl('\\d{2}[A-Za-z]{2}\\d{3}', x)) print("HYDAT needs to be a spatial object")
-  }else{
-    HYBAS.ID <- as.character(spatialEco::point.in.poly(x,HYBAS)$HYBAS_ID)  # Find ID of containing hydrobasins polygon
-    station <-  x[, tolower(names(x)) %in% c("station", "station_number")]
-    st.ar.gr <- x[, tolower(names(x)) %in% c("drainage_area_gross", "drainagearea", "drainagear")]
-    st.ar.ef <- x[, tolower(names(x)) %in% c("drainage_area_effect")]
-    if (length(HYBAS.ID) == 0){ # point outside of HYBAS polygons
-      print("Point is outside of HYBAS")  #TODO: This needs a better solution
-      out <- NULL
-      return(out)
-    }
-  }
-  ## For a given HYBAS ID, get all the upstream basins and their areas
-  upstreamIDs <- FindAllUpstreamSubBasins(HYBAS, HYBAS.ID, ignore.endorheic=ignore.endorheic)
-  if (include.first){ upstreamIDs <- c(upstreamIDs, HYBAS.ID)}
-  subset <- HYBAS[HYBAS$HYBAS_ID %in% upstreamIDs,]
-
-  # Transform to get area
-  subset.t <-  rgeos::gUnaryUnion(sp::spTransform(subset, CRSobj = CRS.AlbersEqualAreaConic))
-  area <- rgeos::gArea(subset.t, byid = F)/1e6
-
-  # Build a filled area -  TODO: this is possibly outdated.  can probably delete.
-  # n <- which.max(sapply(subset.t@polygons[[1]]@Polygons, slot, name='area'))
-  # ring = SpatialPolygons(list(Polygons(list(
-  #  subset.t@polygons[[1]]@Polygons[[n]]),
-  # ID=1)))
-  # ring@proj4string <- subset.t@proj4string
-  # area.ring <- rgeos::gArea(ring, byid = F)/1e6
-
-  # merge polygon and store area measurements
-  out <- rgeos::gUnaryUnion(subset)
-  row.names(out) <- as.character(1:length(out))
-  data <- as.data.frame(list(
-    HYBAS=HYBAS.ID,
-    station=station,
-    station_eff=st.ar.ef,
-    station_gro=st.ar.gr,
-    area=area,
-    filled_area=area.ring,
-    HYB_UP_AR=HYBAS@data[HYBAS$HYBAS_ID==HYBAS.ID,"UP_AREA"]))
-  out <- SpatialPolygonsDataFrame(out, data)
-  return(out)
-  #qur <- list("sp.polygons", querypoly, fill='red')
-  #spplot(sp.layout=list(ups, qur))
-}
-
-#' Upstream Basin 2
+#' Create HydroBASINS catchment basin
 #'
 #' @description Return the upstream basin polygon for a station
 #' @param station A SpatialPointsDataFrame corresponding to the station of intrest
 #' @param ignore.endorheic logical, whether or not to include 'virtual connections' in the HydroSHEDS topology
 #' @return a spatial polygon data frame of the upstream basin in the CRS of the hybas polygon (should be WGS84)
+#' @export
 UpstreamHYBAS <- function(station, HYBAS, ignore.endorheic=F, fast=T){
 
   if (!station@proj4string@projargs == HYBAS@proj4string@projargs){  # Ensure both are in HYBAS CRS (likely WGS84)
@@ -252,20 +187,22 @@ FindNearestRiverSegment <- function(spatialPoint, riverLines, HYBAS){
 }
 
 
-#' Process Station
+#' Create basin delineation from DEM and HydroBASINS
 #'
 #' @description Gives information about a station (upstream area, upstream stations)
 #' @param station Either a SpatialPointsDataFrame or the path to a Hydat-exported table with desired points
 #' or a character vector of station names (in this case a connection must be specified)
 #' @param con (optional) A open database connection.  Used if station is a character vector of station names
-#' @param DEM either
+#' @param DEM.source either
+#' @param DEM.index index shapefile (optional)
 #' @param outdir (optional) A directory to which the output shapefile and report will be saved.  If not specified,
 #' the function will return an R object without saving data to disk.
 #' @param pourpoints spatial points data frame with
 #' @param NCA (optional) Either a character string path or a SpatialPolygonsDataFrame.  This is a polygon
 #' of the non-contributing areas.  If provided, calculates effective drainage area
 #' @return A list of SpatialPolygonDataFrames
-StationPolygon <- function(station, con, outdir, HYBAS, DEM.path, DEM.source, saga.env, NCA, interactive=F,pourpoints,
+#' @export
+DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index, DEM.source, saga.env, NCA, interactive=F,pourpoints,
                            projected.CRS="+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs", ...){
 
   # Figure out what "station" is and read it in
@@ -308,14 +245,22 @@ StationPolygon <- function(station, con, outdir, HYBAS, DEM.path, DEM.source, sa
   disjoint <- rep(F, length(endo))
   not.unlikely <- rep(F, length(endo))
 
-  # find necessary coverage for DEM
+  # find necessary coverage for DEM TODO[NB]: Clean part this up: its a mess!
+  if (!missing(DEM.index)){
+    DEM.path <- OverlayDEM(gUnaryUnion(first.up.HYB),
+                           tileindex=DEM.index, saga.env$workspace, saga.env$workspace,product = DEM.source,
+                           tilename="NTS_SNRC")
+  }else{
+    DEM.path <- OverlayDEM(geom1 = gUnaryUnion(first.up.HYB),
+                           DEM.dir = saga.env$workspace,
+                           output.dir = saga.env$workspace,
+                           product = DEM.source, tol=15e3
+                           )
+  }
 
-  DEM.path <- OverlayNTS(gUnaryUnion(first.up.HYB),
-                         NTS50k, saga.env$workspace, saga.env$workspace,
-                         tilename="NTS_SNRC")
 
   # Get upslope area from DEM
-  DEMresult <- UpslopeDEM(station, DEM.path = DEM.path, saga.env = saga.env,
+  DEMresult <- UpslopeDEM(station, DEM.path = DEM.path, DEM.source=DEM.source, saga.env = saga.env,
                          outdir = saga.env$workspace, projected.CRS=projected.CRS, ...)
   if (DEMresult$nodata==T){ # if the point has no data
     DEM.poly.p <- sp::spTransform(HYB.Poly, CRS = sp::CRS(projected.CRS)) #use different CRS?
@@ -410,7 +355,15 @@ StationPolygon <- function(station, con, outdir, HYBAS, DEM.path, DEM.source, sa
 }
 
 
-# get pour point
+#' Move station to pourpoint
+#'
+#' @description changes the location of a station (point) to that of its
+#' pourpoint using the 'station_number' column as a shared ID.
+#' @param point a SpatialPointsDataFrame representing one station. Must have a column named 'station_number'
+#' @param pourpoint a SpatialPointsDataFrame of pourpoints. Must have a column named 'station_number'
+#' @return A SpatialPointsDataFrame with data identical to the original point,
+#' and the new geometry corresponding to the pour point. If no matching pour point is found,
+#' the original station point is returned
 getPourPoint <- function(point, pourpoint){
   if (point@data$station_number %in% pourpoint@data$station_number) {
     pp <- pourpoint[pourpoint@data$station_number == point@data$station_number, "station_number"]
