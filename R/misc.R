@@ -139,6 +139,9 @@ GetProj4 <- function(x){
 #' @param station character string specifying a station name e.g. "02AB001"
 #' @keywords internal
 NearestHYBAS <- function(station){
+  if (!grepl("^\\d{2}[[:alpha:]]{2}\\d{3}", station)){
+    return(seq(100,999))
+  }
   code = regmatches(x =station ,m = regexpr("^\\d{2}", station))
   basins <- switch(code,
              "01"=c(723, 726),
@@ -251,18 +254,28 @@ SnapToNearest <- function(point, lines){
 #'
 #' @description Creates an R SpatialPointsDataFrame from a csv or
 #' @param file path to *.csv file
+#' @param ID character, column name giving a unique ID for each entry. If Hydat 'station_number' entries are
+#' available for every station, this is the recommended column to use.
 #' @param headerX character, column name containing x coordinate information
 #' @param headerY character, column name containing y coordinate information
 #' @param CRS (optional) character, proj4 string specifying the projection information of the points. If missing,
 #' the default is WGS84
 #' @return SpatialPointsDataFrame
 #' @export
-SpatialCSV <- function(file, headerX, headerY, CRS){
+SpatialCSV <- function(file, headerX, headerY, CRS, ID){
   if (missing(CRS)){
     CRS <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
   }
   CRS <- sp::CRS(CRS)
-  file.data <- read.csv(file)
+  file.data <- read.csv(file, stringsAsFactors = F)
+  if (!missing(ID)){
+    if ('station_number' %in% names(file.data)){
+      warning("station_number column has been overwritten")
+    }
+    file.data$station_number <- file.data[,ID]
+  }else{
+    warning("Missing 'station_number' column. Unexpected behaviour may result with basin delineation tools")
+  }
   coords <- file.data[,c(headerX, headerY)]
   output <- SpatialPointsDataFrame(coords, data=file.data, proj4string = CRS)
   return(output)
@@ -294,7 +307,16 @@ NEDcoverage <- function(geom1, tol, ...){
     geom1 <- sp::spTransform(geom1,
                                 CRSobj = sp::CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
   }
-  coords <- gCentroid(geom1)@coords[1,]
+  coords <- rgeos::gCentroid(geom1)@coords[1,]
   ind <- GraticuleIndices(coords[1], coords[2], tol=tol, ...)
   apply(ind, 1, function(x) USGSTileName(x[1], x[2]))
+}
+
+# add NA columns if missing
+AddMissingColumns <- function(df, columns){
+  missing.cols <- !(columns %in% names(df))
+  to.add <- as.data.frame(matrix(nrow=nrow(df),ncol=sum(missing.cols)))
+  names(to.add) <- columns[missing.cols]
+  df <- cbind(df, to.add)
+  return(df)
 }
