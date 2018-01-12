@@ -320,3 +320,27 @@ AddMissingColumns <- function(df, columns){
   df <- cbind(df, to.add)
   return(df)
 }
+
+#' Extract largest ring
+#'
+#' @description Returns the largest ring from a single polygon feature, retaining original ID value.
+#' @details Finds the biggest ring of a SpatialPolygons* object and uses that ring to create
+#' a new SpatialPolygons object with the same ID value. This can be used to clean up holes/overlap within polygons, or
+#' to remove small polygons within a multipart polygon
+#' @param poly A SpatialPolygons* object with exactly feature/polygon. The feature may have multiple rings.
+#' @return SpatialPolygon
+outerRing <- function(poly){
+  ringNumber <- which.max( # keep biggest ring
+    sapply(
+      poly@polygons[[1]]@Polygons, slot, name='area'
+    ))
+  original.ID <- sapply(slot(poly, "polygons"), function(x) slot(x, "ID"))
+  ring <- SpatialPolygons(
+    list(
+      Polygons(
+        list(
+          poly@polygons[[1]]@Polygons[[ringNumber]]
+        ),
+        ID=original.ID)), proj4string = poly@proj4string)
+  return(ring)
+}

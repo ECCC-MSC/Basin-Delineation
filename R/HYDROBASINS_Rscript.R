@@ -108,9 +108,11 @@ FindUpstreamStations <- function(HYBAS, HYBAS.ID, con, all=T, ...){
 #' @description Return the upstream basin polygon for a station
 #' @param station A SpatialPointsDataFrame corresponding to the station of intrest
 #' @param ignore.endorheic logical, whether or not to include 'virtual connections' in the HydroSHEDS topology
+#' @param outputfile (optional) if provided, saves the upstream hydrobasins to a shapefile. File name must
+#' end with '.shp'
 #' @return a spatial polygon data frame of the upstream basin in the CRS of the hybas polygon (should be WGS84)
 #' @export
-UpstreamHYBAS <- function(station, HYBAS, ignore.endorheic=F, fast=T){
+UpstreamHYBAS <- function(station, HYBAS, ignore.endorheic=F, fast=T, outputfile){
 
   if (!station@proj4string@projargs == HYBAS@proj4string@projargs){  # Ensure both are in HYBAS CRS (likely WGS84)
     station <- sp::spTransform(station, CRSobj = CRS(HYBAS@proj4string@projargs))
@@ -137,6 +139,9 @@ UpstreamHYBAS <- function(station, HYBAS, ignore.endorheic=F, fast=T){
     id <- lapply(names(upstreamIDs), function(x) upstreamIDs[[x]] <- rep(x, length(upstreamIDs[[x]])))
   }
   out@data$ID <- c("A",unlist(id))
+  if (!missing(outputfile)){
+    rgdal::writeOGR(out, dsn=outputfile, layer=basename(outputfile),  driver='ESRI Shapefile')
+  }
  # out <- rgeos::gUnaryUnion(out, id=c("A",unlist(id)))
   return(out)
 }
@@ -154,7 +159,7 @@ UpstreamHYBAS <- function(station, HYBAS, ignore.endorheic=F, fast=T){
 FindNearestRiverSegment <- function(spatialPoint, riverLines, HYBAS){
   if (!missing(HYBAS)){
     # (optional) clip rivers using hybas to speed up transformation
-    riverLines <- gIntersection(HYBAS, rivers, byid = TRUE, drop_lower_td = TRUE)
+    riverLines <- rgeos::gIntersection(HYBAS, rivers, byid = TRUE, drop_lower_td = TRUE)
     }
 
   # reproject rivers and point into UTM if necessary
@@ -202,7 +207,8 @@ FindNearestRiverSegment <- function(spatialPoint, riverLines, HYBAS){
 #' of the non-contributing areas.  If provided, calculates effective drainage area
 #' @return A list of SpatialPolygonDataFrames
 #' @export
-DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index, DEM.source, saga.env, NCA, interactive=F,pourpoints,
+DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index, DEM.source, saga.env,
+                           NCA, interactive=F,pourpoints, default.to.HYB=F,
                            projected.CRS="+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs", ...){
 
   # Figure out what "station" is and read it in
@@ -247,11 +253,11 @@ DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index, DEM.
 
   # find necessary coverage for DEM TODO[NB]: Clean part this up: its a mess!
   if (!missing(DEM.index)){
-    DEM.path <- OverlayDEM(gUnaryUnion(first.up.HYB),
-                           tileindex=DEM.index, saga.env$workspace, saga.env$workspace,product = DEM.source,
+    DEM.path <- OverlayDEM(rgeos::gUnaryUnion(first.up.HYB),
+                           tileindex=DEM.index, saga.env$workspace, saga.env$workspace, product = DEM.source,
                            tilename="NTS_SNRC")
   }else{
-    DEM.path <- OverlayDEM(geom1 = gUnaryUnion(first.up.HYB),
+    DEM.path <- OverlayDEM(geom1 = rgeos::gUnaryUnion(first.up.HYB),
                            DEM.dir = saga.env$workspace,
                            output.dir = saga.env$workspace,
                            product = DEM.source, tol=15e3
@@ -271,12 +277,12 @@ DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index, DEM.
   iterate.thres <- DEMresult$iterate.thres
 
   DEM.Poly.p <- invisible(rgdal::readOGR(DEM.Poly))
-  DEM.Poly.p <- DEM.Poly.p[which.max(area(DEM.Poly.p)),] # take the big one.  others will likely have bad geometries
+  DEM.Poly.p <- DEM.Poly.p[which.max(raster::area(DEM.Poly.p)),] # take the big one.  others will likely have bad geometries
 
 
   # Clip 'nose' of basin
   HP.p <- sp::spTransform(HYB.Poly, CRSobj = sp::CRS(DEM.Poly.p@proj4string@projargs))
-  local.drainage.p <- gIntersection(HP.p[1,], DEM.Poly.p, byid = F, drop_lower_td = TRUE) # DEM area within containing hybas
+  local.drainage.p <- rgeos::gIntersection(HP.p[1,], DEM.Poly.p, byid = F, drop_lower_td = TRUE) # DEM area within containing hybas
 
 
   #=====================
@@ -285,10 +291,10 @@ DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index, DEM.
 
   if (!no.upstream.hyb){
     # if DEM is disjoint with upslope area, do not include it.
-    disjoint <- gDisjoint(HP.p, local.drainage.p, byid = T)
+    disjoint <- rgeos::gDisjoint(HP.p, local.drainage.p, byid = T)
 
     # if calculated total upslope area is less than half of an upslope HYBAS region, remove that HYBAS region
-    not.unlikely <- area(DEM.Poly.p) > 0.5*area(sp::spTransform(first.up.HYB.endo, CRS(DEM.Poly.p@proj4string@projargs)))
+    not.unlikely <- raster::area(DEM.Poly.p) > 0.5*raster::area(sp::spTransform(first.up.HYB.endo, CRS(DEM.Poly.p@proj4string@projargs)))
   }
 
   keep <- ID.list[(!disjoint | endo) & (not.unlikely | endo)]
@@ -296,19 +302,21 @@ DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index, DEM.
   HP.out <- HP.p[keep,]
 
   # merge desired parts of HYBAS polygons with local drainage
-  if (pointbuffer >= iterate.to){
-    output <- gUnaryUnion(HP.p)
-  }else if (length(HP.out) > 0 & !no.upstream.hyb){
-    HP.p <- gUnaryUnion(HP.out)
-    output <- gUnion(local.drainage.p, HP.out)
+  if (pointbuffer >= iterate.to & default.to.HYB){      # in this case, just use the HYBAS
+    output <- rgeos::gUnaryUnion(HP.p)
+  }else if ((length(HP.out) > 0 & !no.upstream.hyb)|
+            (pointbuffer >= iterate.to & !default.to.HYB)){
+    HP.p <- rgeos::gUnaryUnion(HP.out)
+    output <- rgeos::gUnion(local.drainage.p, HP.out)
   }else{
-    output <- gUnaryUnion(local.drainage.p)
+    output <- rgeos::gUnaryUnion(local.drainage.p)
   }
 
-  dr_ar <- area(output) *1e-6
+  dr_ar <- raster::area(output) *1e-6
 
-  # clean geometry with a zero-width buffer
-  output <- gBuffer(output, byid=TRUE, width=0)
+  # clean geometry with a zero-width buffer and remove holes / small rings
+  output <- rgeos::gBuffer(output, byid=TRUE, width=0)
+  output <- outerRing(output)
 
   # Calculate non-contributing areas
   if (!missing(NCA)){
@@ -316,14 +324,17 @@ DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index, DEM.
     if (NCA@proj4string@projargs != projected.CRS){
     NCA <- sp::spTransform(NCA, sp::CRS(projected.CRS))
     }
-     clipped <- gDifference(output, NCA)
-     drainage.effective <- round(area(clipped)) * 1e-6
+     clipped <- rgeos::gDifference(output, NCA)
+     drainage.effective <- round(raster::area(clipped)) * 1e-6
     print("take out non-contributing area") # take out non-contributing area
   }else{
     drainage.effective <- NA
   }
 
   # create attribute table
+  station@data <- AddMissingColumns(station@data,
+                                    c("drainage_area_gross", "drainage_area_effect"))
+
   data <- as.data.frame(list(  # make output table
     stn_number=station@data$station_number,
     drainar_gr=dr_ar,
@@ -334,7 +345,8 @@ DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index, DEM.
     trgtRdMax=iterate.to,
     iterThres=iterate.thres,
     snapped=DEMresult$snapped,
-    snap.dist=DEMresult$snap.dist
+    snapDist=DEMresult$snap.dist,
+    DEM_source=DEM.source
   ))
 
    output <-  sp::spTransform(SpatialPolygonsDataFrame(output, data), # output shape file with same CRS as station
