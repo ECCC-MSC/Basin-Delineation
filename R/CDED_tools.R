@@ -41,7 +41,7 @@ GetNTSDEMTilePath <- function(NTS, product="CDED"){
         "CDSM" = "http://ftp.geogratis.gc.ca/pub/nrcan_rncan/elevation/cdsm_mnsc")
   FTP.path <- switch(product,
             "CDED" = paste(basepath, resolution, substr(NTS, 1,3), NTS, sep='/'),
-            "CDEM" = paste(basepath, substr(NTS, 1,3), paste("cdem_dem",NTS, "tif", sep="_"), sep='/'),
+            "CDEM" = paste(basepath, substr(NTS, 1,3), paste("cdem_dem", toupper(NTS), "tif", sep="_"), sep='/'),
             "CDSM" = paste(basepath, substr(NTS, 1,3), paste(toupper(NTS), "_cdsm_final", sep=""), sep='/'))
   FTP.path <- paste(FTP.path, '.zip', sep='')
   return(FTP.path)
@@ -183,10 +183,15 @@ OverlayDEM <- function(geom1, tileindex, DEM.dir, output.dir, tol,  product='CDE
   # get DEM names
   if (!missing(tol)){  # use geometry points
     if (product %in% c('CDED', 'CDEM', 'CDSM')){
-      tile.names <- unlist(lapply(rcanvec::nts(bbox=ExpandBBox(geom1, tol)), paste, collapse=''))
+      atscale = ifelse(toupper(product) == 'CDEM', 1, 2)
+      tiles <- rcanvec::nts(bbox=ExpandBBox(geom1, tol), atscale=atscale)
+      tile.names <- ifelse(class(tiles)=='list',
+                           unlist(lapply(tiles, paste, collapse='')),
+                           paste(tiles, collapse=''))
     }else if (product=='NED'){
       tile.names <- NEDcoverage(geom1, tol)
     }
+    print(tile.names)
   }else if (!missing(tileindex)){ # use tile index
     tile.names <- TileIndex(geom1, tileindex, tile.id.field)
   }

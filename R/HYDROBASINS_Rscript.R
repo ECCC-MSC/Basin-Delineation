@@ -298,16 +298,18 @@ DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index, DEM.
   }
 
   keep <- ID.list[(!disjoint | endo) & (not.unlikely | endo)]
-  keep <- keep[-which(keep=="A")]
-  HP.out <- HP.p[keep,]
+  HP.out <- HP.p[keep[-which(keep=="A")],] # maybe can delete this?
 
   # merge desired parts of HYBAS polygons with local drainage
   if (pointbuffer >= iterate.to & default.to.HYB){      # in this case, just use the HYBAS
     output <- rgeos::gUnaryUnion(HP.p)
   }else if ((length(HP.out) > 0 & !no.upstream.hyb)|
             (pointbuffer >= iterate.to & !default.to.HYB)){
-    HP.p <- rgeos::gUnaryUnion(HP.out)
-    output <- rgeos::gUnion(local.drainage.p, HP.out)
+    # HP.p.merged <- rgeos::gUnaryUnion(HP.out)
+    # output <- rgeos::gUnion(local.drainage.p, HP.out)
+    ContainingHydrobasins <- HP.p[keep] #include containing ("A") hydrobasin
+    DEMwithinHB <- rgeos::gIntersection(DEM.Poly.p, ContainingHydrobasins)
+    output <- rgeos::gUnion(HP.out, DEMwithinHB)
   }else{
     output <- rgeos::gUnaryUnion(local.drainage.p)
   }
@@ -363,7 +365,7 @@ DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index, DEM.
   #clean up (optional?)
  # file.remove(DEM.Poly)
 
-  return(list(hyb = HP.p, dem = local.drainage.p, out=output))
+  return(list(includedHYB=HP.out, dem.local=local.drainage.p, out=output, orig.DEM=DEM.Poly.p, allHYB=HP.p))
 }
 
 
