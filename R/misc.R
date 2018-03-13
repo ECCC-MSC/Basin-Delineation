@@ -7,6 +7,9 @@
 #' @param lat.m (optional) numeric vector - northing of location, minutes (if lat is not specified in decimal degrees)
 #' @param lat.s (optional) numeric vector - northing of location, seconds (if lat is not specified in decimal degrees)
 #' @return numeric vector of lengths  (measured in kilometres)
+#' @examples
+#' LongitudeLength(61.4)
+#' LongitudeLength(34,2,24)
 #' @export
 LongitudeLength <- function(lat, lat.m, lat.s){
   lon.at.eq = 111.321
@@ -31,6 +34,8 @@ LongitudeLength <- function(lat, lat.m, lat.s){
 #' @param long numeric longitude in decimal degrees
 #' @details (floor((long + 180)/6) %% 60) + 1
 #' @return integer UTM zone number
+#' @examples
+#' WhichZone(-125.7)
 #' @export
 WhichZone <- function(long){
   zone <- (floor((long + 180)/6) %% 60) + 1
@@ -45,6 +50,8 @@ WhichZone <- function(long){
 #' @param lat numeric latitude
 #' @param fext file extension for output filename (needs leading '.')
 #' @keywords internal
+#' @examples
+#' HydroTile(-126.4, 56)
 #' @export
 HydroTile <- function(long, lat, fext=''){
   x <- floor(long/5)*5
@@ -59,9 +66,13 @@ HydroTile <- function(long, lat, fext=''){
 #'
 #' @description Finds all HydroSHEDS DEM tiles within a specified tolerance of a point.  To be used
 #' with 3 arc-second hydrologically conditioned DEM.
+#' @param long longitude in decimal degrees
+#' @param lat latitude in decimal degrees
 #' @param tol Tolerance in m to consider
 #' @return A vector of grid names to load
 #' @keywords internal
+#' @examples
+#' HydroMosaic(-115, 52, 50000)
 #' @export
 HydroMosaic <- function(long, lat, tol, ...){
   tol <- tol * 0.001 # convert to km
@@ -200,13 +211,22 @@ SameCRS <- function(spgeom1, spgeom2){
 #' Shapefile Helper
 #'
 #' @description allows for shapefiles to be passed as character strings or
-#' as R spatial objects in other functions
-#' @param x either an R spatial object or a character string specifying a shapefile path
+#' as R spatial objects in other functions.
+#' @param x either an R spatial object or a character string specifying a
+#' shapefile path
+#' @param use_sf logical, whether or not to try to use use the 'sf' package
+#' to read the shapefile quickly.
 #' @export
 #' @keywords internal
-InterpretShapefile <- function(x){
+InterpretShapefile <- function(x, use_sf=T, quiet=T){
   if (class(x)=="character"){
-    x <- rgdal::readOGR(x)
+    if (require(sf)){
+      x <- sf::st_read(x, quiet=quiet)
+      x <- st_zm(x)  # drop Z and M dimensions
+      x <- as(x, "Spatial")
+    }else{
+      x <- rgdal::readOGR(x, verbose=!quiet)
+    }
     return(x)
   }
   if (grepl("Spatial", class(x))){
@@ -323,10 +343,12 @@ AddMissingColumns <- function(df, columns){
 
 #' Extract largest ring
 #'
-#' @description Returns the largest ring from a single polygon feature, retaining original ID value.
-#' @details Finds the biggest ring of a SpatialPolygons* object and uses that ring to create
-#' a new SpatialPolygons object with the same ID value. This can be used to clean up holes/overlap within polygons, or
-#' to remove small polygons within a multipart polygon
+#' @description Returns the largest ring from a single polygon feature,
+#' retaining original ID value.
+#' @details Finds the biggest ring of a SpatialPolygons* object and uses that
+#' ring to create a new SpatialPolygons object with the same ID value. This can
+#'  be used to clean up holes/overlap within polygons, or to remove small
+#'  polygons within a multipart polygon
 #' @param poly A SpatialPolygons* object with exactly feature/polygon. The feature may have multiple rings.
 #' @return SpatialPolygon
 outerRing <- function(poly){
@@ -344,3 +366,16 @@ outerRing <- function(poly){
         ID=original.ID)), proj4string = poly@proj4string)
   return(ring)
 }
+
+
+#' Add character strings on either end of a character string
+#' @export
+#' @keywords internal
+pad <- function(text, pads, rpads){
+  if (missing(rpads)){
+    sprintf(paste('%s',text,'%s', sep=''), pads, pads)
+  }else{
+    sprintf(paste('%s',text,'%s', sep=''), pads, rpads)
+  }
+}
+

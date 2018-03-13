@@ -179,19 +179,23 @@ CompileDEM <- function(DEM, DEM.dir, output.dir, force.50k=F, product='CDED'){
 #' @return name of output DEM
 #' @export
 OverlayDEM <- function(geom1, tileindex, DEM.dir, output.dir, tol,  product='CDED', tile.id.field="NTS_SNRC", ...){
-  #if (grepl("Poly",class(v$hyb))){tol <- 1e3}
+
   # get DEM names
   if (!missing(tol)){  # use geometry points
     if (product %in% c('CDED', 'CDEM', 'CDSM')){
       atscale = ifelse(toupper(product) == 'CDEM', 1, 2)
       tiles <- rcanvec::nts(bbox=ExpandBBox(geom1, tol), atscale=atscale)
-      tile.names <- ifelse(class(tiles)=='list',
-                           unlist(lapply(tiles, paste, collapse='')),
-                           paste(tiles, collapse=''))
+      if (class(tiles)=='list'){
+        tile.names <- unlist(lapply(tiles, paste, collapse=''))
+      }else{
+        tile.names <- paste(tiles, collapse='')
+      }
+      # tile.names <- ifelse(class(tiles)=='list',
+      #                      unlist(lapply(tiles, paste, collapse='')),
+      #                      paste(tiles, collapse=''))
     }else if (product=='NED'){
       tile.names <- NEDcoverage(geom1, tol)
     }
-    print(tile.names)
   }else if (!missing(tileindex)){ # use tile index
     tile.names <- TileIndex(geom1, tileindex, tile.id.field)
   }

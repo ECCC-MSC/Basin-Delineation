@@ -21,7 +21,7 @@
 #' @param DEM.source character, one of: c('CDED', 'NED', 'CDEM, CDSM', 'SHEDS'). Ignored if a DEM file is supplied to DEM.path
 #' @param DEM.path One of:
 #'  (1) a file path to a directory containing DEM files either in the the format n%%w0%%_con_grid.sgrd (if DEM.source is 'SHEDS')
-#'  or a directory to which DEM tiles will be downloaded (if DEM.source='NTS', 'CDED' etc.),
+#'  or a directory to which DEM tiles will be downloaded (if DEM.source='CDEM', 'CDED' etc.),
 #'  (2) a file path to a dem file in SAGA format.  The DEM should be in a projected coordinate system and the coordinate
 #'  system should match that of the point (e.g. Canada Albers Conformal Conic)
 #' @param dem.clip.square How big (in m) a clip should be generated from the original DEM (too big doesn't work and is slower)
@@ -102,7 +102,7 @@ UpslopeDEM <- function(point, DEM.path, DEM.source='NTS', saga.env, outdir, poin
 
   nodata <- F
   if (is.na(value)){
-    print("station outside of CDED coverage, switching to ")
+    print("station outside of CDED coverage, switching to NED data")
     in.DEM <- OverlayDEM(point, DEM.dir=DEM.path, output.dir=saga.env$workspace,
                          product = 'NED', tol=dem.clip.square)
    # nodata <- T
@@ -136,7 +136,7 @@ run <- TRUE
     # Find Area
     area <- GridVolumeRS(upslope, level = 99, saga.env=envi) # returns in m2
 
-    if (abs(area - pi*pointbuffer**2)*1e-6 < iterate.thres){  # if upslope area didn't work, try widening search radius
+    if (abs(area - pi*pointbuffer**2)*1e-6 < iterate.thres | pointbuffer > iterate.to ){  # if upslope area didn't work, try widening search radius
       pointbuffer <- pointbuffer + iterate.incr
 
     if (pointbuffer > iterate.to | snapped==TRUE){
@@ -583,3 +583,4 @@ SampleRasterRS <- function(point, grid, saga.env, verbose=F){
   x <- x@data[,ncol(x@data)]
   return(x)
 }
+

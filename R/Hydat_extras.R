@@ -164,3 +164,70 @@ bool.check <- function(vec){
   }
   vec
 }
+
+#' Extract feature name from HYDAT station name
+#'
+#' @param station_name character string; station name from Hydat station
+#' @return character string corresponding to the hydrographic feature associated with the station (i.e.
+#' the name of a lake, river, stream etc)
+#' @description returns a string that is compatible with the canadian geographic names databse
+#' @examples
+#' ParseStationName("PEARSON CREEK NEAR PROCTER")
+#' ParseStationName("SCHIAVON CREEK BELOW HIGHEST DIVERSION NEAR THRUMS")
+#' ParseStationName("MADAWASKA (RIVIER) EN AVAL DU BARRAGE TEMISCOUATA")
+#' @export
+ParseStationName <- function(station_name){
+  name <- toupper(station_name)
+  join_terms_en <- c("AT", "ABOVE", "BELOW", "NEAR",
+                     "EAST OF", "IN", "OUTFLOW", "BETWEEN" )
+  join_terms_fr_1 <- c("EN AVAL", "EN AMONT", "CENTRALE", "PRES" )  #"AU" "A LA"
+  join_terms_fr_2 <- c("DU", "DE LA", "DE", "DE L'")
+  join_terms_fr_3 <- c("AU", "A LA")
+
+    #try to split on english join term
+  splitters <- sapply(join_terms_en, pad, pads=' ')
+  matches <- sapply(splitters, function(p) gregexpr(p, text=station_name)[[1]][1]) # find all splitting terms
+  if (!all(matches == -1)){ # if any there are any matches...
+    matches[matches==-1] <- NA
+    first_split <- splitters[which.min(matches)] # find first instance of splitting term
+    name <- strsplit(station_name, split=first_split)[[1]][1]
+
+  }else{ # if that fails, assume french name and move parenthetical description
+    name <- gsub("([[:alnum:][:blank:]\\.\\'-]*) \\(([[:alnum:][:blank:]\\']*)\\).*", '\\2 \\1', station_name)
+  }
+  # Clean up name
+  # remove anything after{ a comma, SITE, NO.
+  name <- gsub("\\.", "", name) # strip off any periods
+  # deal with any remaining parenthetical material?
+
+  return(name)
+}
+
+#' Get expected geometry of waterbody based on station name
+#'
+#' @param name name of waterbody
+#' @keywords internal
+#' @export
+StationNameGeometry <- function(name){
+  # List of common terms
+  features_RIV_fr <- c("RIVIERE", "RIVIER", "CHENAL", "BRAS", "RUISSEAU", "FLEUVE", "CANAL")
+  features_LAC_fr <- c( "LAC", "BASSIN","ETANG", "BAIE")
+  features_LAC_en <- c( "LAKE", "BASIN","RESERVOIR", "POND", "SWAMP", "SLOUGH", "SWAMP", "BAY", "POND" )
+  features_RIV_en <- c("RIVER", "CREEK", "BROOK", "STREAM", "CHANNEL", "CANAL", "RUN", "SPILLWAY", "TRIBUTARY", "DIVERSION", "FLOW")
+  features_OTH_en <- c("DRAIN", "DITCH", "RILL", "SPRING", "SPRINGS", "COULEE")
+
+  name <- toupper(name)
+  # Try to determine expected shape geometry
+  RIV_cnt <- sum(match(unlist(strsplit(name, ' ')), c(features_RIV_en, features_RIV_fr)), na.rm=T)
+  LAC_cnt <- sum(match(unlist(strsplit(name, ' ')), c(features_LAC_en, features_LAC_fr)), na.rm=T)
+
+  if (RIV_cnt>0 & LAC_cnt==0){
+    geometry <- "LINE"
+  }else if (RIV_cnt==0 & LAC_cnt>0){
+    geometry <- "POLYGON"
+  }else{
+    geometry <- "UNKNOWN"
+  }
+  return(geometry)
+}
+
