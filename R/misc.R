@@ -349,23 +349,35 @@ AddMissingColumns <- function(df, columns){
 #' ring to create a new SpatialPolygons object with the same ID value. This can
 #'  be used to clean up holes/overlap within polygons, or to remove small
 #'  polygons within a multipart polygon
-#' @param poly A SpatialPolygons* object with exactly feature/polygon. The feature may have multiple rings.
+#' @param poly A SpatialPolygons* object. The feature may have multiple rings.
+#' If an object with multiple shapes is passed, the function is iterated over
+#' all entries.
 #' @return SpatialPolygon
 outerRing <- function(poly){
-  ringNumber <- which.max( # keep biggest ring
+  reduce <- function(x){
+    ringNumber <- which.max( # keep biggest ring
     sapply(
-      poly@polygons[[1]]@Polygons, slot, name='area'
+      x@polygons[[1]]@Polygons, slot, name='area'
     ))
-  original.ID <- sapply(slot(poly, "polygons"), function(x) slot(x, "ID"))
+  original.ID <- sapply(slot(x, "polygons"), function(x) slot(x, "ID"))
   ring <- SpatialPolygons(
     list(
       Polygons(
         list(
-          poly@polygons[[1]]@Polygons[[ringNumber]]
+          x@polygons[[1]]@Polygons[[ringNumber]]
         ),
-        ID=original.ID)), proj4string = poly@proj4string)
+        ID=original.ID)), proj4string = x@proj4string)
   return(ring)
-}
+  }
+
+  if (length(poly@polygons) == 1){
+    return(reduce(poly))
+  }else if (length(poly@polygons) > 1){
+    L <- lapply(seq_along(poly), function(S) reduce(poly[S,]))
+    L <- do.call(rbind, L)
+    return(L)
+    }
+  }
 
 
 #' Add character strings on either end of a character string

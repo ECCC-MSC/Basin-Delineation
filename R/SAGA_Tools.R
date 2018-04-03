@@ -2,9 +2,6 @@
 # - run command in commandline
 # - sometimes the variables names are different between versions of SAGA, (e.g. INTERPOL instead of RESAMPLING)
 
-
-
-
 #' Calculate upslope polygon from DEM
 #'
 #' @description Create a drainage basin shapefile using a DEM and a 'pour point'.  The polygon is

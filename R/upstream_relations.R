@@ -42,6 +42,9 @@ initialize_matrix_from_stations <- function(stations, diagnl=9){
   return(M)
 }
 
+add_station_to_matrix <- function(stations, table){
+
+}
 #' Check transitivity of station matrix
 #'
 #'@description  Finds all monitoring stations that violate the assumption
@@ -97,78 +100,78 @@ FindUpstreamStations <- function(basin, stations, target_station,
 
 
 #===============================================================================
-
-
-
-###
-##  Make matrices
-###
-p_ON <- p[p$prov_terr_state_loc=="ON" & p$hyd_status=="ACTIVE",]
-
-server_files <- list.files('M:\\Basin_Classification\\Ontario_Active\\final_basin',
-                           full.names = T, pattern = sprintf("\\.shp$"))
-M <- initialize_matrix_from_stations(p_ON$station_number)
-for (name in p_ON$station_number){
-  basin_file <- server_files[grepl(name, server_files)]
-
-  if (length(basin_file) !=0){
-    upstr <- FindUpstreamStations(basin=basin_file,
-                                  stations = p_ON,
-                                  target_station = name)
-    set_upstream(station = name, table = M, upstream = upstr)
-  } else{
-     print(sprintf("skipping station %s", name))
-   }
-
-}
-
-server_files <- list.files('K:\\WSC_BasinCharacteristics\\Data\\BasinDelineations\\All_Basins',
-           full.names = T, pattern = sprintf("\\.shp$"))
-## EXISTING BASINS
-M2 <- initialize_matrix_from_stations(p_ON$station_number)
-for (name in p_ON$station_number){
-  basin_file <- server_files[grepl(name, server_files)]
-  if (length(basin_file) !=0){
-    print(basin_file)
-    upstr <- FindUpstreamStations(basin=basin_file,
-                                  stations = p_ON,
-                                  target_station = name)
-    set_upstream(station = name, table = M2, upstream = upstr)
-  } else{
-    print(sprintf("skipping station %s", name))
-  }
-
-}
-
-
-##
-# Workspace
-##
-
-stations <- c("04FA004", "02GA002", "07TR010", "04FK044", "04MB010")
-stations <- p@data$station_number
-stations <- stations[p@data$hyd_status == 'ACTIVE' & !is.na(p@data$hyd_status)]
-
-#A <- data.table(matrix('0',nrow=length(stations), ncol=length(stations)+1))
-A <- cbind(rep("", length(stations)),data.table( 9*diag(length(stations))))
-setnames(A, c("ID",stations))
-A[,"ID"] <- stations
-setkey(A, ID)
-setcolorder(A, c("ID",A[,ID]))
-
-fwrite(A, "C:/NB/upstream_active_stns.csv")
-A <- fread("C:/NB/upstreamtable.csv")
-#A[,-1] <- data.table(diag(length(stations))*9)
-A[,names(A)[-1] := diag(5)]
-
-set_upstream_dt("01AD001", A, c("01AD004", "01AD005", "01AD08") )
-set_upstream_dt("01AD009", A, c("01AD012", "01AD013") )
-set_upstream_dt("01AD012", A, c("01AD013") )
-
-set_upstream_dt("02GA002", A, c('04FA004', '04FK044' ,'04MB010', '07TR010') )
-set_upstream_dt('04FA004', A, c('04FK044' ,'04MB010') )
-
-
-up_04fa004 <- c('04FK044', '04MB010')
-as.list(names(A) %in% up_04fa004)
-
+#
+#
+#
+# ###
+# ##  Make matrices
+# ###
+# p_ON <- p[p$prov_terr_state_loc=="ON" & p$hyd_status=="ACTIVE",]
+#
+# server_files <- list.files('M:\\Basin_Classification\\Ontario_Active\\final_basin',
+#                            full.names = T, pattern = sprintf("\\.shp$"))
+# M <- initialize_matrix_from_stations(p_ON$station_number)
+# for (name in p_ON$station_number){
+#   basin_file <- server_files[grepl(name, server_files)]
+#
+#   if (length(basin_file) !=0){
+#     upstr <- FindUpstreamStations(basin=basin_file,
+#                                   stations = p_ON,
+#                                   target_station = name)
+#     set_upstream(station = name, table = M, upstream = upstr)
+#   } else{
+#      print(sprintf("skipping station %s", name))
+#    }
+#
+# }
+#
+# server_files <- list.files('K:\\WSC_BasinCharacteristics\\Data\\BasinDelineations\\All_Basins',
+#            full.names = T, pattern = sprintf("\\.shp$"))
+# ## EXISTING BASINS
+# M2 <- initialize_matrix_from_stations(p_ON$station_number)
+# for (name in p_ON$station_number){
+#   basin_file <- server_files[grepl(name, server_files)]
+#   if (length(basin_file) !=0){
+#     print(basin_file)
+#     upstr <- FindUpstreamStations(basin=basin_file,
+#                                   stations = p_ON,
+#                                   target_station = name)
+#     set_upstream(station = name, table = M2, upstream = upstr)
+#   } else{
+#     print(sprintf("skipping station %s", name))
+#   }
+#
+# }
+#
+#
+# ##
+# # Workspace
+# ##
+#
+# stations <- c("04FA004", "02GA002", "07TR010", "04FK044", "04MB010")
+# stations <- p@data$station_number
+# stations <- stations[p@data$hyd_status == 'ACTIVE' & !is.na(p@data$hyd_status)]
+#
+# #A <- data.table(matrix('0',nrow=length(stations), ncol=length(stations)+1))
+# A <- cbind(rep("", length(stations)),data.table( 9*diag(length(stations))))
+# setnames(A, c("ID",stations))
+# A[,"ID"] <- stations
+# setkey(A, ID)
+# setcolorder(A, c("ID",A[,ID]))
+#
+# fwrite(A, "C:/NB/upstream_active_stns.csv")
+# A <- fread("C:/NB/upstreamtable.csv")
+# #A[,-1] <- data.table(diag(length(stations))*9)
+# A[,names(A)[-1] := diag(5)]
+#
+# set_upstream_dt("01AD001", A, c("01AD004", "01AD005", "01AD08") )
+# set_upstream_dt("01AD009", A, c("01AD012", "01AD013") )
+# set_upstream_dt("01AD012", A, c("01AD013") )
+#
+# set_upstream_dt("02GA002", A, c('04FA004', '04FK044' ,'04MB010', '07TR010') )
+# set_upstream_dt('04FA004', A, c('04FK044' ,'04MB010') )
+#
+#
+# up_04fa004 <- c('04FK044', '04MB010')
+# as.list(names(A) %in% up_04fa004)
+#

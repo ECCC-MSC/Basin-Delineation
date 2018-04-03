@@ -29,7 +29,7 @@ LoadHybas <- function(path, area='na', level=7){
   }
   ## Read in Shapefile
   print(paste("loading", file.to.load))
-  shpdata <- rgdal::readOGR(file.to.load)
+  shpdata <- rgdal::readOGR(file.to.load, stringsAsFactors = FALSE)
 
   return(shpdata)
 }

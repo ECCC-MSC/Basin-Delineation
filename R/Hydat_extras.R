@@ -198,6 +198,8 @@ ParseStationName <- function(station_name){
   # Clean up name
   # remove anything after{ a comma, SITE, NO.
   name <- gsub("\\.", "", name) # strip off any periods
+  name <- gsub("' ", "'",name) # get rid of spaces after apostrophes
+
   # deal with any remaining parenthetical material?
 
   return(name)
@@ -211,12 +213,14 @@ ParseStationName <- function(station_name){
 StationNameGeometry <- function(name){
   # List of common terms
   features_RIV_fr <- c("RIVIERE", "RIVIER", "CHENAL", "BRAS", "RUISSEAU", "FLEUVE", "CANAL")
-  features_LAC_fr <- c( "LAC", "BASSIN","ETANG", "BAIE")
-  features_LAC_en <- c( "LAKE", "BASIN","RESERVOIR", "POND", "SWAMP", "SLOUGH", "SWAMP", "BAY", "POND" )
+  features_LAC_fr <- c( "LAC", "BASSIN","ETANG", "BAIE", "LACS")
+  features_LAC_en <- c( "LAKE", "BASIN","RESERVOIR", "POND", "SWAMP", "SLOUGH", "SWAMP", "BAY", "POND", "LAKES" )
   features_RIV_en <- c("RIVER", "CREEK", "BROOK", "STREAM", "CHANNEL", "CANAL", "RUN", "SPILLWAY", "TRIBUTARY", "DIVERSION", "FLOW")
   features_OTH_en <- c("DRAIN", "DITCH", "RILL", "SPRING", "SPRINGS", "COULEE")
 
   name <- toupper(name)
+  name <- gsub("[^[:alnum:] ]", '', name) # remove wildcards if present
+
   # Try to determine expected shape geometry
   RIV_cnt <- sum(match(unlist(strsplit(name, ' ')), c(features_RIV_en, features_RIV_fr)), na.rm=T)
   LAC_cnt <- sum(match(unlist(strsplit(name, ' ')), c(features_LAC_en, features_LAC_fr)), na.rm=T)

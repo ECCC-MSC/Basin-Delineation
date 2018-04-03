@@ -64,7 +64,6 @@ CGNDBHydroKML <- function(station, dstfile){
   if (is.null(file)){return(NULL)}
   shape <- readOGR(file)
 
-
   return(shape)
 
   # tryCatch({
@@ -105,13 +104,15 @@ FilterKMLGeometry <- function(kml.file, geom, tryAlternate=T){
                      'point' ='MultiPoint',
                      'line'="MultiLineString",
                      'polygon'="MultiPolygon")
-  out.file <- gsub("\\.kml$", paste("_", tolower(geom), "\\.kml", sep=''), kml.file)
+  out.file <- gsub("\\.kml$", paste("_", tolower(geom), "\\.shp", sep=''), kml.file)
 
   # convert to desired type
-  ogr2ogr(src=kml.file,
-          dst=out.file, f='kml',
+  gdalUtils::ogr2ogr(src=kml.file,
+          dst=out.file, f='ESRI Shapefile',
           where=sprintf("OGR_GEOMETRY = '%s'", OGR.geom),
           mapFieldType = 'DateTime=String')
 
   return(out.file)
 }
+
+

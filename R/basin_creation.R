@@ -69,7 +69,7 @@ HYBASBasinLimits <- function(df, HYBAS, code, outdir,
 
   # save output file
   out <- HYBAS[HYBAS$HYBAS_ID %in% ids,]
-  outname <- paste(df[,df.id], "HYBAS_Basin.shp", sep='_')
+  outname <- paste(df[,stn.id], "HYBAS_Basin.shp", sep='_')
   outfile <- file.path(outdir, outname)
   writeOGR(obj = out, dsn = outfile, layer = gsub('\\.shp','', outname),
            driver = "ESRI Shapefile", overwrite_layer = T)
@@ -94,7 +94,7 @@ HYBASBasinLimits <- function(df, HYBAS, code, outdir,
 #===============================================================================
 CombineWatersheds <- function(station, shedspoly_folder, dempoly_folder,
                               out_folder){
-
+  if (!class(station)=='character'){stop("station should be a character string")}
   # find hydrobasins polygon in folder
   HYB_shp <- list.files(shedspoly_folder, pattern = paste0(station, ".*\\.shp$"),
                         full.names = T)
@@ -128,7 +128,7 @@ CombineWatersheds <- function(station, shedspoly_folder, dempoly_folder,
   output <- output[which.max(lapply(output@polygons, slot, name='area')),]
 
   # remove holes (inner rings)
-
+  output <- outerRing(output)
 
   # add in data to attributes table
   data <- DEM_data[,c('station_number', 'pointbuffer', 'nodata', 'snap.dist',
@@ -145,7 +145,7 @@ CombineWatersheds <- function(station, shedspoly_folder, dempoly_folder,
            dsn = file_out,
            layer = basename(file_out),
            driver = 'ESRI Shapefile')
-  write.csv(output@data, gsub("shp", "csv", file_out), row.names=F, quote=F)
+  write.csv(output@data, sub("shp$", "csv", file_out), row.names=F, quote=F)
   }
 
 #===============================================================================
@@ -314,8 +314,301 @@ DEMDrainageBasin <- function(point, DEM.path, DEM.source='NTS', saga.env,
   write.csv(meta, gsub("shp", "csv", final.name), row.names = F, quote=F)
 }
 
+#===============================================================================
+#' @title Ca
+#'
+#' @description Create Hydrobasins upstream boundaries for a hydrometric station
+#' on a lake
+#'
+#' @param station_point a Spatialpointsdataframe of the hydrometric station
+#'
+#' @param saga.env an rsaga environment object
+#'
+#' @param output_folder where to save final output
+#'
+#' @return lake polygon and hydrobasins
+#'
+#' @export
+#===============================================================================
+HYBASBasinLimits_Lake <- function(station_point, HYBAS, lakes_folder,
+                                  output_folder, stn_num_col='station_number',
+                                  stn_name_col='station_name'){
+
+  station_name <- as.data.frame(station_point)[,stn_name_col]
+  station_number <- as.data.frame(station_point)[,stn_num_col]
+  waterbody <- ParseStationName(station_name)
+  name <- paste0(waterbody,".*.shp")
+  match <-list.files(lakes_folder, pattern=name, full.names=T)
+
+  # get shapefile if it exists, otherwise download & convert kml
+  if(length(match)==0){
+    lac_geom <- CGNDBHydroKML(waterbody,
+                              file.path(lakes_folder,gsub("\\*\\.shp$", "kml",name)))
+  }else if (length(match)>=1){
+    if (length(match)>1){
+      match <-list.files(lakes_folder, pattern=paste0(waterbody,"_polygon.shp"),
+                         full.names=T)[1]
+      warning(sprintf("Multiple matching lake shapefiles found for %s.  Using %s",
+                      station_name, match))
+    }
+    lac_geom <- readOGR(match, verbose=F, stringsAsFactors = FALSE)
+    if(nrow(lac_geom)==0){return(NULL)}
+    lac_geom <- outerRing(lac_geom)
+}
+
+  # reproject into planar coords
+  albers <- "+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0
+                 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs"
+
+  lac_geom_p <- sp::spTransform(lac_geom, sp::CRS(albers))
+  station_point_p <- sp::spTransform(station_point, sp::CRS(albers))
+
+  # find nearest lake polygon
+  distance <- gDistance(station_point_p, lac_geom_p, byid=TRUE)
+  min_dist <- min(distance)
+  print(sprintf("Lake-station distance is %.01f m", min_dist))
+  lac_geom <- lac_geom[which.min(distance),]
+
+  # get intersect with hydrobasins
+  basins <- sp::over(lac_geom, HYBAS, returnList = T)[[1]]
+
+  # Find 'outlet' hybas and return all upstream
+  outlet <- basins[which.max(basins$UP_AREA),]
+  watershed <- FindAllUpstreamSubBasins(HYBAS, outlet$HYBAS_ID)
+
+  #also find stn containing hybas (in case lake polygon misses it somehow)
+  containing <- sp::over(station_point, HYBAS, returnList = T)[[1]]
+  stn_up <- FindAllUpstreamSubBasins(HYBAS, containing$HYBAS_ID)
+
+  hyb_select <- union(c(outlet$HYBAS_ID, watershed), c(stn_up, containing$HYBAS_ID))
+  HYB_out <- HYBAS[HYBAS$HYBAS_ID %in% hyb_select,]
+  print(outlet$HYBAS_ID)
 
 
+  if (!missing(output_folder)){
+    out_file <- file.path(output_folder, paste0(station_number, "_HYBAS_Basin.shp"))
+    writeOGR(obj = HYB_out, dsn = out_file, layer = basename(out_file) ,
+             driver = 'ESRI Shapefile')
+    return(list(lake=lac_geom, hybas=HYB_out))
+  }else{
+    return(list(lake=lac_geom, hybas=HYB_out))
+  }
+}
+
+
+
+
+#===============================================================================
+#' @title Calculate basin area for a hydrometric station on a lake using a DEM
+#'
+#' @description Create a drainage basin shapefile using a DEM and a
+#'
+#' @param point a SpatialPointsDataFrame corresponding to a hydrometric station.
+#'  Must be in same coordinates system as DEM and coordinate system
+#' must be projected (not lat/long).  Must have longitude and latitude attributes.
+#'
+#' @param saga.env an rsaga environment object
+#'
+#' @param outdir Directory to output final upslope shapefile
+#'
+#' @param DEM.source character, one of: c('CDED', 'NED', 'CDEM, CDSM', 'SHEDS').
+#'  Ignored if a DEM file is supplied to DEM.path
+#'
+#' @param DEM.path One of:
+#'  (1) a file path to a directory containing DEM files either in the the format
+#'   n%%w0%%_con_grid.sgrd (if DEM.source is 'SHEDS') or a directory to which DEM
+#'   tiles will be downloaded (if DEM.source='CDEM', 'CDED' etc.),
+#'  (2) a file path to a dem file in SAGA format.  The DEM should be in a
+#'  projected coordinate system and the coordinate system should match that of
+#'  the point (e.g. Canada Albers Conformal Conic)
+#'
+#'
+#' @return A l
+#'
+#' @export
+#===============================================================================
+LakeDEM <- function(station_point, lake_poly, lake_hybas_limit, DEM.path, outdir,
+                    saga.env,
+                    DEM.source='SHEDS',
+                    stn_name_col = 'station_name',
+                    stn_num_col = 'station_number'){
+  # set params
+  station_name   <- station_point@data[, stn_name_col]
+  station_number <- station_point@data[, stn_num_col]
+  albers <- "+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0
+                 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs"
+
+  final.name <- file.path(outdir, paste(station_number,"_upslope.shp",sep=''))
+
+  # get snap distance for output
+  snap_dist <- as.character(
+    gDistance(sp::spTransform(station_point, sp::CRS(albers)),
+                         sp::spTransform(lake_poly, sp::CRS(albers)), byid=TRUE))
+
+  # find most downstream hybas that overlaps lake
+
+  lake_overlap <- over(lake_poly, lake_hybas_limit, returnlist=T)
+  if (class(lake_overlap)=='list'){lake_overlap <- lake_overlap[[1]]}
+  lowest_id <- lake_overlap$HYBAS_ID[which.max(lake_overlap$UP_AREA)]
+
+  #hyb_max <- which.max(lake_hybas_limit$UP_AREA)
+  outlet <- lake_hybas_limit[lake_hybas_limit$HYBAS_ID==lowest_id,]
+
+  # clip out front of lake
+  lake_clip <- gIntersection(outlet, lake_poly)
+  lake_clip <- SpatialPolygonsDataFrame(lake_clip, data=data.frame(what='lake_clip'))
+  lake_clip_p <- sp::spTransform(lake_clip, sp::CRS(albers)) #reproject
+
+  # Make DEM
+  point <- gCentroid(lake_clip)
+  point <- SpatialPointsDataFrame(point@coords, data=data.frame(what='centroid'),
+                                  proj4string = lake_clip@proj4string)
+  point_p <- sp::spTransform(point, sp::CRS(albers)) #reproject
+  outlet_p <- sp::spTransform(outlet, sp::CRS(albers))
+
+  dem.clip.square <- max(outlet_p@bbox[,2] - outlet_p@bbox[,1])*1.25
+
+  in.DEM <- gsub("\\.sdat$", "\\.sgrd", DEM.path)
+
+  if (tolower(DEM.source)=='sheds'){
+    name <- HydroMosaic(point@coords[,1], point@coords[,2], tol=dem.clip.square)
+    if (length(name)==1){
+      check.if.exists <- list.files(in.DEM, pattern=paste(name, ".sgrd", sep=''),
+                                    full.names = T, recursive = T)
+      if (length(check.if.exists) ==0){  #  if sgrid doesn't exist, create it
+        original.DEM <- GetTilePathsHS(name, in.DEM)
+        print(sprintf("Converting %s DEM to sgrd...", original.DEM))
+        dstfile <- gsub("_con$","_con\\.sdat",original.DEM)
+        gdal_warp2SAGA(original.DEM, outputCRS = projected.CRS, dstfile = dstfile)
+
+      }
+      in.DEM <- list.files(in.DEM, pattern=paste(name,".sgrd$", sep=''), full.names = T, recursive = T)
+      print(sprintf("Using %s as input DEM", in.DEM))
+
+    }else if (length(name) > 1){ # need to mosaic and transform
+      print('Multiple grids Necessary...')
+      original.DEM <- GetTilePathsHS(name, in.DEM)
+      in.DEM <- MosaicAndWarp(gridnames = name, DEM.path = in.DEM, saga.env = saga.env, outputCRS = albers)
+    }
+
+  }else if (toupper(DEM.source) %in% c('CDED','NED', 'CDEM', 'CDSM')){
+    print(DEM.source) #debug only
+    in.DEM <- OverlayDEM(point, DEM.dir=DEM.path, output.dir=saga.env$workspace,
+                         product = DEM.source, tol=dem.clip.square) # clip from DEM
+
+  }else{
+    print("Could not find suitable DEM in folder")
+    return()
+  }
+
+  # Test if point is outside of raster limits (e.g. in USA)
+  value <- SampleRasterRS(point = point_p, grid = in.DEM, saga.env=saga.env )
+  nodata <- FALSE
+
+  if (is.na(value)){
+    print("station outside of CDED coverage, switching to NED data")
+    nodata <- TRUE
+    in.DEM <- OverlayDEM(point, DEM.dir=DEM.path, output.dir=saga.env$workspace,
+                         product = 'NED', tol=dem.clip.square)
+  }
+
+  # Clip grid to point
+  if (dem.clip.square > 0){
+    ClipGridRS(point_p, in.DEM, 'clipped.sgrd', saga.env, tol=dem.clip.square)
+  }
+
+  # Fill Sinks
+  FillSinksRS(ifelse((dem.clip.square > 0),'clipped.sgrd',in.DEM),
+              'filled.sgrd', saga.env, MINSLOPE=0.01)
+
+  # rasterize
+  target <- Point2GridRS(lake_clip_p, 'filled.sgrd', 'target.sgrd',  saga.env, buffer.dist=0)
+
+  upslope <- UpslopeAreaRS('filled.sgrd', 'target.sgrd', 'upslope.sgrd', saga.env, method=0)
+
+  # Convert to polygon (save final shape)
+  Grid2PolyRS(upslope, final.name, saga.env)
+
+  # calculate area
+  area <- GridVolumeRS(upslope, level = 99, saga.env=envi)*1e-6
+
+  meta <- data.frame(
+    station_number=station_number,
+    final.name = final.name,
+    area = area,
+    pointbuffer=0,
+    nodata = nodata,
+    snap.dist = snap_dist,
+    DEM = DEM.source,
+    cell_acc = 0,
+    method = 'D8')
+
+  # write output
+  write.csv(meta, sub("shp$", "csv", final.name), row.names = F, quote=F)
+}
+
+#===============================================================================
+
+# LakeDEM(station = stn, lake_poly = x$lake, lake_hybas_limit = x$hybas,
+#         DEM.path = 'C:\\Users\\brownn\\Downloads\\HydroSHEDS_DEM_3s',
+#         DEM.source='SHEDS',
+#         saga.env = envi,
+#         outdir = "C:\\NB\\midlertidig\\result5\\DEM")
+
+
+#===============================================================================
+#' @title Make upstream basin boundaries for a station on a lake
+#'
+#' @description a wrapper to two other functions
+#'
+#' @param point a SpatialPointsDataFrame corresponding to a hydrometric station.
+#'  Must be in same coordinates system as DEM and coordinate system
+#' must be projected (not lat/long).  Must have longitude and latitude attributes.
+#'
+#' @param saga.env an rsaga environment object
+#'
+#' @param outdir_HYBAS Directory to output final upslope hydrobasins boundaries
+#'
+#' @param DEM.source character, one of: c('CDED', 'NED', 'CDEM, CDSM', 'SHEDS').
+#'  Ignored if a DEM file is supplied to DEM.path
+#'
+#' @param DEM.path One of:
+#'  (1) a file path to a directory containing DEM files either in the the format
+#'   n%%w0%%_con_grid.sgrd (if DEM.source is 'SHEDS') or a directory to which DEM
+#'   tiles will be downloaded (if DEM.source='CDEM', 'CDED' etc.),
+#'  (2) a file path to a dem file in SAGA format.  The DEM should be in a
+#'  projected coordinate system and the coordinate system should match that of
+#'  the point (e.g. Canada Albers Conformal Conic)
+#'
+#'
+#' @export
+#===============================================================================
+Lake_Station <-  function(station_point, HYBAS, lakes_folder, DEM.path,
+                          DEM.source, outdir_DEM,
+                          outdir_HYBAS, saga.env,
+                          stn_num_col='station_number',
+                          stn_name_col='station_name' ){
+
+  shapes <-  HYBASBasinLimits_Lake (station_point=station_point,
+                                    HYBAS=HYBAS,
+                                    lakes_folder=lakes_folder,
+                                    output_folder=outdir_HYBAS,
+                                    stn_num_col=stn_num_col,
+                                    stn_name_col=stn_name_col)
+
+  if (is.null(shapes)){return(NULL)}
+
+  LakeDEM(station = station_point,
+          lake_poly = shapes$lake,
+          lake_hybas_limit = shapes$hybas,
+          DEM.path = DEM.path,
+          DEM.source = DEM.source,
+          outdir = outdir_DEM,
+          saga.env = saga.env,
+          stn_num_col=stn_num_col,
+          stn_name_col=stn_name_col)
+
+}
 
 
 
