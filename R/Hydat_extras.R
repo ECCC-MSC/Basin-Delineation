@@ -1,12 +1,20 @@
-#'  SpatialHydat
+#===============================================================================
+#' @title Create spatial object from Hydat connection
 #'
-#' @title Create a SpatialPointsDataFrame from a Hydat database connection.
+#'
 #' @description  Create a SpatialPointsDataFrame from the "STATIONS" Hydat table.
-#' @param con  An open SQLite database connection to the HYDAT database or a character string pointing to
+#'
+#' @param con  An open SQLite database connection to the HYDAT database or a
+#' character string pointing to
 #' a SQLite database
-#' @param ...  Optional character vector of stations to subset (passed to HYDAT::StationMetaData))
+#'
+#' @param ...  Optional character vector of stations to subset (passed to
+#' HYDAT::StationMetaData))
+#'
 #' @return A SpatialPointsDataFrame for the Hydat stations
+#'
 #' @export
+#===============================================================================
 SpatialHydat <- function(con, ...){
   if (class(con)=="character"){
     if (!requireNamespace("RSQLite")){
@@ -25,15 +33,21 @@ SpatialHydat <- function(con, ...){
   return(output)
 }
 
-#'  SpatialECDE
+#===============================================================================
+#' @title Spatial ECDE
 #'
-#' @title Create a SpatialPointsDataFrame from ECDE table export.
 #' @description  Create a SpatialPointsDataFrame from ECDE table export.
+#'
 #' @param data.file  A file exported from ECDE
-#' @param data.format  (optional) Character string describing file type.  Options include: ('csv', 'tb0', 'dbf' or 'pt2').
-#'   If missing, will use file extension to guess.
+#'
+#' @param data.format  (optional) Character string describing file type.
+#' Options include: ('csv', 'tb0', 'dbf' or 'pt2').  If missing, the file
+#' extension of data.file will be used as a guess.
+#'
 #' @return A SpatialPointsDataFrame for the Hydat stations
+#'
 #' @export
+#===============================================================================
 SpatialECDE <- function(data.file, data.format){
   # Read in data and deal with any formatting issues
   if (missing(data.format)){
@@ -43,15 +57,20 @@ SpatialECDE <- function(data.file, data.format){
     input <- read.csv(data.file, stringsAsFactors = F)
       if ("DISCLAIMER" %in% input[,1]){
         headers <- names(input)
-        input <- read.csv(data.file, skip=2, header = F, blank.lines.skip = T, stringsAsFactors = F)
+        input <- read.csv(data.file, skip=2, header = F, blank.lines.skip = T,
+                          stringsAsFactors = F)
+
         names(input) <- headers
-        input <- input[-c(nrow(input),nrow(input)-1),] # Get rid of DISCLAIMER rows
+        input <- input[-c(nrow(input),nrow(input)-1),] # remove DISCLAIMER rows
       }
     # clean leading spaces
     i <- lapply(input, class) == "character"
     input[,i] <- sapply(input[,i], gsub, pattern="^ ", replacement="")
   }else if (data.format == 'dbf'){
-    if (!requireNamespace("foreign")){print("Missing library: 'foreign', try another format or install package")}
+    if (!requireNamespace("foreign")){
+      print("Missing library: 'foreign', try another format or install package")
+    }
+
     input <- foreign::read.dbf(data.file)
   }else if (data.format == 'tb0'){
     input <- read.tb0(data.file)
@@ -61,7 +80,7 @@ SpatialECDE <- function(data.file, data.format){
     print("Could not read file. Try specifying a data format")
   }
   if (data.format != "dbf") {
-    input[] <- lapply(input, bool.check)
+    input[] <- lapply(input, BoolCheck)
   }
   input[,sapply(input, class)=="factor"] <- lapply(input[,sapply(input, class)=="factor"], as.character)
 
@@ -78,19 +97,25 @@ SpatialECDE <- function(data.file, data.format){
   names(input) <- sub("^realtime$", "real_time", names(input))
 
   coord <- input[,c("longitude","latitude")]
-  output <- sp::SpatialPointsDataFrame(coords = coord, data=input, proj4string = sp::CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0") )
+  output <- sp::SpatialPointsDataFrame(coords = coord, data=input,
+                proj4string = sp::CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0") )
+
   return(output)
 }
 
-
-#' Read *.pt2
+#===============================================================================
+#' @title Read pt2 file
 #'
-#' @title Read in a pt2 file from EC Data explorer output table
-#' @description  Read in a pt2 file from EC Data explorer output table. Does some type
-#' conversion to make the output the same as the read.tb0 and read.dbf functions for ECDE
+#' @description  Read in a pt2 file from EC Data explorer output table. Does
+#' some type conversion to make the output the same as the read.tb0 and read.dbf
+#' functions for ECDE
+#'
 #' @param x  pt2 file from EC Data explorer export
+#'
 #' @return A data.frame with (hopefully) appropriate data types
+#'
 #' @export
+#===============================================================================
 read.pt2 <- function(x){
   # read in header information
   n.attributes <- read.table(x, skip = 15, nrows = 1)[1,2]
@@ -105,7 +130,6 @@ read.pt2 <- function(x){
   names(out) <- names.attributes
 
   ## Note that some things are stored as factors and they get screwed up during read-in. Correct this:
-  # this gets a little ugly...
 
   # format text strings
   which.factors <- grepl(pattern = '.* oneof', data.types)
@@ -130,14 +154,18 @@ read.pt2 <- function(x){
   return(out)
 }
 
-#' Read *.tb0
+#===============================================================================
+#' @title Read *.tb0
 #'
-#' @title Read in a tb0 file from EC Data explorer output table
 #' @description  Read in a tb0 file from EC Data explorer output table. Does some type
 #' conversion to make the output the same as the read.pt2 and read.dbf functions for ECDE
+#'
 #' @param x  tb0 file from EC Data explorer export
+#'
 #' @return A data.frame with (hopefully) appropriate data types
+#'
 #' @export
+#===============================================================================
 read.tb0 <- function(x){
   colnam <- read.table(x, skip = 26, nrows = 1, stringsAsFactors = F)
   colnam <- colnam[1,-1]
@@ -147,54 +175,81 @@ read.tb0 <- function(x){
   return(out)
 }
 
-#'  Convert to Boolean
+#===============================================================================
+#' @title Convert vector to logical
 #'
-#' @title Create a SpatialPointsDataFrame from ECDE table export.
 #' @description  Changes vectors into Boolean when appropriate
+#'
 #' @param vec  A vector (any type)
+#'
 #' @return the original unchanged vector, or if possible a boolean
+#'
 #' @keywords internal
-#' @export
-bool.check <- function(vec){
+#===============================================================================
+BoolCheck <- function(vec){
   if (class(vec) == "character") {
     vec.uniq <- trimws(tolower(unique(vec)))
     if (("true" %in% vec.uniq | "false" %in% vec.uniq) & (length(vec.uniq) <=2)){
       vec <- as.logical(trimws(vec))
     }
   }
-  vec
+  return(vec)
 }
 
-#' Extract feature name from HYDAT station name
+#===============================================================================
+#' @title Waterbody name from HYDAT station name
 #'
 #' @param station_name character string; station name from Hydat station
-#' @return character string corresponding to the hydrographic feature associated with the station (i.e.
-#' the name of a lake, river, stream etc)
-#' @description returns a string that is compatible with the canadian geographic names databse
+#'
+#' @return character string corresponding to the hydrographic feature associated
+#' with the station (i.e. the name of a lake, river, stream etc)
+#'
+#' @description Given a NHS / Hydat hydrometric station name, attempts to isolate
+#' the name of the waterbody on which the station resides.
+#'
+#' @details The returned value can be used to query the canadian geographic
+#'  names database.
+#'
+#' @return a character string of the waterbody name
+#'
 #' @examples
 #' ParseStationName("PEARSON CREEK NEAR PROCTER")
 #' ParseStationName("SCHIAVON CREEK BELOW HIGHEST DIVERSION NEAR THRUMS")
 #' ParseStationName("MADAWASKA (RIVIER) EN AVAL DU BARRAGE TEMISCOUATA")
+#'
 #' @export
+#===============================================================================
 ParseStationName <- function(station_name){
   name <- toupper(station_name)
+
   join_terms_en <- c("AT", "ABOVE", "BELOW", "NEAR",
-                     "EAST OF", "IN", "OUTFLOW", "BETWEEN" )
-  join_terms_fr_1 <- c("EN AVAL", "EN AMONT", "CENTRALE", "PRES" )  #"AU" "A LA"
+                     "EAST OF", "IN", "OUTFLOW", "BETWEEN", "WEST OF", "NORTH OF",
+                     "SOUTH OF")
+  join_terms_fr_1 <- c("EN AVAL", "EN AMONT", "CENTRALE", "PRES" )
   join_terms_fr_2 <- c("DU", "DE LA", "DE", "DE L'")
   join_terms_fr_3 <- c("AU", "A LA")
 
-    #try to split on english join term
+  #try to split on english join term
   splitters <- sapply(join_terms_en, pad, pads=' ')
-  matches <- sapply(splitters, function(p) gregexpr(p, text=station_name)[[1]][1]) # find all splitting terms
-  if (!all(matches == -1)){ # if any there are any matches...
+
+  # find all splitting terms
+  matches <- sapply(splitters,
+                    function(p) gregexpr(p, text=station_name)[[1]][1])
+
+  # if any there are any matches...
+  if (!all(matches == -1)){
     matches[matches==-1] <- NA
     first_split <- splitters[which.min(matches)] # find first instance of splitting term
     name <- strsplit(station_name, split=first_split)[[1]][1]
 
-  }else{ # if that fails, assume french name and move parenthetical description
-    name <- gsub("([[:alnum:][:blank:]\\.\\'-]*) \\(([[:alnum:][:blank:]\\']*)\\).*", '\\2 \\1', station_name)
+  # if that fails, assume its a french name and move parenthetical description
+  }else{
+    name <- gsub(
+      "([[:alnum:][:blank:]\\.\\'-]*) \\(([[:alnum:][:blank:]\\']*)\\).*",
+      '\\2 \\1',
+      station_name)
   }
+
   # Clean up name
   # remove anything after{ a comma, SITE, NO.
   name <- gsub("\\.", "", name) # strip off any periods
@@ -205,25 +260,39 @@ ParseStationName <- function(station_name){
   return(name)
 }
 
-#' Get expected geometry of waterbody based on station name
+#===============================================================================
+#' @title Geometry of waterbody from station name
+#'
+#' @desciption Attempts to figure out the geometry of a waterbody (point, polygon,
+#' line) based on its name
 #'
 #' @param name name of waterbody
+#'
 #' @keywords internal
+#'
 #' @export
+#===============================================================================
 StationNameGeometry <- function(name){
+
   # List of common terms
-  features_RIV_fr <- c("RIVIERE", "RIVIER", "CHENAL", "BRAS", "RUISSEAU", "FLEUVE", "CANAL")
+  features_RIV_fr <- c("RIVIERE", "RIVIER", "CHENAL", "BRAS", "RUISSEAU",
+                       "FLEUVE", "CANAL")
   features_LAC_fr <- c( "LAC", "BASSIN","ETANG", "BAIE", "LACS")
-  features_LAC_en <- c( "LAKE", "BASIN","RESERVOIR", "POND", "SWAMP", "SLOUGH", "SWAMP", "BAY", "POND", "LAKES" )
-  features_RIV_en <- c("RIVER", "CREEK", "BROOK", "STREAM", "CHANNEL", "CANAL", "RUN", "SPILLWAY", "TRIBUTARY", "DIVERSION", "FLOW")
+  features_LAC_en <- c( "LAKE", "BASIN","RESERVOIR", "POND", "SWAMP", "SLOUGH",
+                        "SWAMP", "BAY", "POND", "LAKES" )
+  features_RIV_en <- c("RIVER", "CREEK", "BROOK", "STREAM", "CHANNEL", "CANAL",
+                       "RUN", "SPILLWAY", "TRIBUTARY", "DIVERSION", "FLOW")
   features_OTH_en <- c("DRAIN", "DITCH", "RILL", "SPRING", "SPRINGS", "COULEE")
 
   name <- toupper(name)
   name <- gsub("[^[:alnum:] ]", '', name) # remove wildcards if present
 
   # Try to determine expected shape geometry
-  RIV_cnt <- sum(match(unlist(strsplit(name, ' ')), c(features_RIV_en, features_RIV_fr)), na.rm=T)
-  LAC_cnt <- sum(match(unlist(strsplit(name, ' ')), c(features_LAC_en, features_LAC_fr)), na.rm=T)
+  RIV_cnt <- sum(match(unlist(strsplit(name, ' ')),
+                       c(features_RIV_en, features_RIV_fr)), na.rm=T)
+
+  LAC_cnt <- sum(match(unlist(strsplit(name, ' ')),
+                       c(features_LAC_en, features_LAC_fr)), na.rm=T)
 
   if (RIV_cnt>0 & LAC_cnt==0){
     geometry <- "LINE"

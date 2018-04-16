@@ -45,14 +45,19 @@ HYBASBasinLimits <- function(df, HYBAS, code, outdir,
     ids <- FindAllUpstreamSubBasins(HYBAS=HYBAS, HYBAS.ID = df[,hyb.id])
 
   }else if (code %in% c("Pct")){
-    next2up <- FindUpstreamSubBasins(HYBAS=HYBAS, HYBAS.ID = df[,hyb.id], ignore.endorheic = T)
+    next2up <- FindUpstreamSubBasins(HYBAS=HYBAS,
+                                     HYBAS.ID = df[,hyb.id],
+                                     ignore.endorheic = T)
+
     next2up <- HYBAS[HYBAS$HYBAS_ID %in% next2up,]
     nextup <- next2up@data[which.min(next2up$UP_AREA), "HYBAS_ID"] # find ID of next-up on smaller branch
     ids <- FindAllUpstreamSubBasins(HYBAS=HYBAS, HYBAS.ID = nextup)
     ids <- c(ids, nextup)
 
   }else if (code %in% c("Pcm")){
-    next2up <- FindUpstreamSubBasins(HYBAS=HYBAS, HYBAS.ID = df[,hyb.id], ignore.endorheic = T)
+    next2up <- FindUpstreamSubBasins(HYBAS=HYBAS, HYBAS.ID = df[,hyb.id],
+                                     ignore.endorheic = T)
+
     next2up <- HYBAS[HYBAS$HYBAS_ID %in% next2up,]
     nextup <- next2up@data[which.max(next2up$UP_AREA), "HYBAS_ID"] # find ID of next-up on main branch
     ids <- FindAllUpstreamSubBasins(HYBAS=HYBAS, HYBAS.ID = nextup)
@@ -267,9 +272,10 @@ DEMDrainageBasin <- function(point, DEM.path, DEM.source='NTS', saga.env,
 
   nodata <- F
   if (is.na(value)){
-    print("station outside of CDED coverage, switching to NED data")
+    print("station outside of DEM coverage, switching to NED data")
     in.DEM <- OverlayDEM(point, DEM.dir=DEM.path, output.dir=saga.env$workspace,
                          product = 'NED', tol=dem.clip.square)
+    DEM.source <- "NED"
   }
 
   # Clip grid to point
@@ -315,10 +321,10 @@ DEMDrainageBasin <- function(point, DEM.path, DEM.source='NTS', saga.env,
 }
 
 #===============================================================================
-#' @title Ca
+#' @title Create HydroBASINS catchment for a hydrometric station on a lake
 #'
 #' @description Create Hydrobasins upstream boundaries for a hydrometric station
-#' on a lake
+#' on a lake using the HydroBASINS data product
 #'
 #' @param station_point a Spatialpointsdataframe of the hydrometric station
 #'
@@ -326,7 +332,8 @@ DEMDrainageBasin <- function(point, DEM.path, DEM.source='NTS', saga.env,
 #'
 #' @param output_folder where to save final output
 #'
-#' @return lake polygon and hydrobasins
+#' @return A list containing two spatialpolygons data frames (the lake and
+#' the catchment area)
 #'
 #' @export
 #===============================================================================
@@ -335,6 +342,7 @@ HYBASBasinLimits_Lake <- function(station_point, HYBAS, lakes_folder,
                                   stn_name_col='station_name'){
 
   station_name <- as.data.frame(station_point)[,stn_name_col]
+  print(station_name)
   station_number <- as.data.frame(station_point)[,stn_num_col]
   waterbody <- ParseStationName(station_name)
   name <- paste0(waterbody,".*.shp")
@@ -434,6 +442,7 @@ LakeDEM <- function(station_point, lake_poly, lake_hybas_limit, DEM.path, outdir
                     stn_num_col = 'station_number'){
   # set params
   station_name   <- station_point@data[, stn_name_col]
+  print(station_name)
   station_number <- station_point@data[, stn_num_col]
   albers <- "+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0
                  +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs"
@@ -547,19 +556,12 @@ LakeDEM <- function(station_point, lake_poly, lake_hybas_limit, DEM.path, outdir
   write.csv(meta, sub("shp$", "csv", final.name), row.names = F, quote=F)
 }
 
-#===============================================================================
-
-# LakeDEM(station = stn, lake_poly = x$lake, lake_hybas_limit = x$hybas,
-#         DEM.path = 'C:\\Users\\brownn\\Downloads\\HydroSHEDS_DEM_3s',
-#         DEM.source='SHEDS',
-#         saga.env = envi,
-#         outdir = "C:\\NB\\midlertidig\\result5\\DEM")
 
 
 #===============================================================================
 #' @title Make upstream basin boundaries for a station on a lake
 #'
-#' @description a wrapper to two other functions
+#' @description This function acts a wrapper for two other functions
 #'
 #' @param point a SpatialPointsDataFrame corresponding to a hydrometric station.
 #'  Must be in same coordinates system as DEM and coordinate system
