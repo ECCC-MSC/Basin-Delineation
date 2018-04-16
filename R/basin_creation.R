@@ -142,7 +142,8 @@ CombineWatersheds <- function(station, shedspoly_folder, dempoly_folder,
   rownames(data) <- sapply(output@polygons, slot, name='ID')
   output <- SpatialPolygonsDataFrame(output, data)
 
-  output <- sp::spTransform(output, CRSobj = CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
+  output <- sp::spTransform(output,
+              CRSobj = CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
 
   # write output
   file_out <- file.path(out_folder, paste0(station,"_cntrb_basin.shp"))
@@ -236,23 +237,31 @@ DEMDrainageBasin <- function(point, DEM.path, DEM.source='NTS', saga.env,
   if (!grepl("\\.sgrd$", in.DEM)){  # if not an SGRD file (then we expect a directory or a list of names)
 
     if (tolower(DEM.source)=='sheds'){
-      name <- HydroMosaic(point@data$longitude, point@data$latitude, tol=dem.clip.square)
+      name <- HydroMosaic(point@data$longitude, point@data$latitude,
+                          tol=dem.clip.square)
+
       if (length(name)==1){
-        check.if.exists <- list.files(in.DEM, pattern=paste(name, ".sgrd", sep=''), full.names = T, recursive = T)
+        check.if.exists <- list.files(in.DEM,
+                                      pattern=paste(name, ".sgrd", sep=''),
+                                      full.names = T, recursive = T)
+
         if (length(check.if.exists) ==0){  #  if sgrid doesn't exist, create it
           original.DEM <- GetTilePathsHS(name, in.DEM)
           print(sprintf("Converting %s DEM to sgrd...", original.DEM))
           dstfile <- gsub("_con$","_con\\.sdat",original.DEM)
           gdal_warp2SAGA(original.DEM, outputCRS = projected.CRS, dstfile = dstfile)
-
         }
-        in.DEM <- list.files(in.DEM, pattern=paste(name,".sgrd$", sep=''), full.names = T, recursive = T)
+
+        in.DEM <- list.files(in.DEM, pattern=paste(name,".sgrd$", sep=''),
+                             full.names = T, recursive = T)
+
         print(sprintf("Using %s as input DEM", in.DEM))
 
       }else if (length(name) > 1){ # need to mosaic and transform
         print('Multiple grids Necessary...')
         original.DEM <- GetTilePathsHS(name, in.DEM)
-        in.DEM <- MosaicAndWarp(gridnames = name, DEM.path = in.DEM, saga.env = saga.env, outputCRS = projected.CRS)
+        in.DEM <- MosaicAndWarp(gridnames = name, DEM.path = in.DEM,
+                                saga.env = saga.env, outputCRS = projected.CRS)
       }
 
     }else if (toupper(DEM.source) %in% c('CDED','NED', 'CDEM', 'CDSM')){
@@ -288,14 +297,19 @@ DEMDrainageBasin <- function(point, DEM.path, DEM.source='NTS', saga.env,
               'filled.sgrd', saga.env, MINSLOPE=0.01, ...)
 
   # Upslope
-  snapped.pt <- SnapToPourPoint(point, 'filled.sgrd', saga.env=saga.env, upstream.threshold=upstream.threshold)
+  snapped.pt <- SnapToPourPoint(point, 'filled.sgrd', saga.env=saga.env,
+                                upstream.threshold=upstream.threshold)
+
   point <- snapped.pt$station
   snap.dist <- snapped.pt$distance
   pointbuffer <- pb.init
   # Point to Grid
-  Point2GridRS(point, 'filled.sgrd', 'target.sgrd',  saga.env, buffer.dist=pointbuffer, ...)
+  Point2GridRS(point, 'filled.sgrd', 'target.sgrd',  saga.env,
+               buffer.dist=pointbuffer, ...)
 
-  upslope <- UpslopeAreaRS('filled.sgrd', 'target.sgrd', 'upslope.sgrd', saga.env, method=method, ...)
+  upslope <- UpslopeAreaRS('filled.sgrd', 'target.sgrd', 'upslope.sgrd',
+                           saga.env, method=method, ...)
+
   if (method==1){
     upslope <- GridThresholdRS(upslope, threshold.value = 0, saga.env=envi)
   }
@@ -491,13 +505,16 @@ LakeDEM <- function(station_point, lake_poly, lake_hybas_limit, DEM.path, outdir
         gdal_warp2SAGA(original.DEM, outputCRS = projected.CRS, dstfile = dstfile)
 
       }
-      in.DEM <- list.files(in.DEM, pattern=paste(name,".sgrd$", sep=''), full.names = T, recursive = T)
+      in.DEM <- list.files(in.DEM, pattern=paste(name,".sgrd$", sep=''),
+                           full.names = T, recursive = T)
+
       print(sprintf("Using %s as input DEM", in.DEM))
 
     }else if (length(name) > 1){ # need to mosaic and transform
       print('Multiple grids Necessary...')
       original.DEM <- GetTilePathsHS(name, in.DEM)
-      in.DEM <- MosaicAndWarp(gridnames = name, DEM.path = in.DEM, saga.env = saga.env, outputCRS = albers)
+      in.DEM <- MosaicAndWarp(gridnames = name, DEM.path = in.DEM,
+                              saga.env = saga.env, outputCRS = albers)
     }
 
   }else if (toupper(DEM.source) %in% c('CDED','NED', 'CDEM', 'CDSM')){
@@ -531,9 +548,11 @@ LakeDEM <- function(station_point, lake_poly, lake_hybas_limit, DEM.path, outdir
               'filled.sgrd', saga.env, MINSLOPE=0.01)
 
   # rasterize
-  target <- Point2GridRS(lake_clip_p, 'filled.sgrd', 'target.sgrd',  saga.env, buffer.dist=0)
+  target <- Point2GridRS(lake_clip_p, 'filled.sgrd', 'target.sgrd',
+                         saga.env, buffer.dist=0)
 
-  upslope <- UpslopeAreaRS('filled.sgrd', 'target.sgrd', 'upslope.sgrd', saga.env, method=0)
+  upslope <- UpslopeAreaRS('filled.sgrd', 'target.sgrd', 'upslope.sgrd',
+                           saga.env, method=0)
 
   # Convert to polygon (save final shape)
   Grid2PolyRS(upslope, final.name, saga.env)

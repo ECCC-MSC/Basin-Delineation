@@ -31,7 +31,9 @@ LoadHybas <- function(path, area='na', level=7){
   ## If directory provided, search directory and find desired file (takes first if duplicates)
   match.name <- paste("hybas_", area, sprintf("_lev%02d", level), sep='')
   match.name.reg <- paste(match.name, ".*shp$", sep='')
-  files <-  list.files(path, recursive=T, pattern=match.name.reg, ignore.case = T, full.names = T)
+  files <-  list.files(path, recursive=T, pattern=match.name.reg,
+                       ignore.case = T, full.names = T)
+
   file.to.load <- files[1]
 
   }else{ #otherwise load file directly
@@ -72,7 +74,8 @@ FindDownstreamBasins <- function(HYBAS.ID, HYBAS, max.pass=-1, ignore.endo=T){
   i=0
   while(length(HYBAS.NEW) > 0 & (max.pass==-1 | i < max.pass)){
     if (ignore.endo){
-      HYBAS.DOWN <- HYBAS@data[HYBAS$HYBAS_ID %in% HYBAS.NEW & HYBAS$ENDO !=2,"NEXT_DOWN"]
+      HYBAS.DOWN <- HYBAS@data[HYBAS$HYBAS_ID %in% HYBAS.NEW & HYBAS$ENDO !=2,
+                               "NEXT_DOWN"]
     }else{
       HYBAS.DOWN <- HYBAS@data[HYBAS$HYBAS_ID %in% HYBAS.NEW, "NEXT_DOWN"]
     }
@@ -132,7 +135,8 @@ FindUpstreamSubBasins <- function(HYBAS, HYBAS.ID, ignore.endorheic=F){
 #'
 #' @param HYBAS.ID: The HYBAS.ID of the sub-basin from which to go upstream
 #'
-#' @param ignore.endorheic Whether or not to ignore 'virtual' inputs from inland basins. defaults to FALSE.
+#' @param ignore.endorheic Whether or not to ignore 'virtual' inputs from inland
+#'  basins. defaults to FALSE.
 #'
 #' @export
 #===============================================================================
@@ -201,7 +205,8 @@ UpstreamHYBAS <- function(station, HYBAS, ignore.endorheic=F, fast=T, outputfile
   }
 
   if (fast){ # subset basins first
-    HYBAS <- HYBAS[substr(HYBAS$PFAF_ID,1,3) %in% NearestHYBAS(station@data$station_number), ]
+    HYBAS <- HYBAS[substr(HYBAS$PFAF_ID,1,3) %in%
+                     NearestHYBAS(station@data$station_number), ]
   }
 
   HYBAS.ID <- as.character(spatialEco::point.in.poly(station, HYBAS)$HYBAS_ID)  # Find ID of containing hydrobasins polygon
@@ -213,16 +218,23 @@ UpstreamHYBAS <- function(station, HYBAS, ignore.endorheic=F, fast=T, outputfile
     }
 
   ## For a given HYBAS ID, get all the upstream basins and their areas
-  upstreamIDs <- FindAllUpstreamSubBasins(HYBAS, HYBAS.ID, ignore.endorheic=ignore.endorheic, split = T)
-  out <- HYBAS[match(c(HYBAS.ID ,unlist(upstreamIDs)), HYBAS@data$HYBAS_ID, nomatch=0),]
+  upstreamIDs <- FindAllUpstreamSubBasins(HYBAS, HYBAS.ID,
+                                          ignore.endorheic=ignore.endorheic,
+                                          split = T)
+
+  out <- HYBAS[match(c(HYBAS.ID ,unlist(upstreamIDs)), HYBAS@data$HYBAS_ID,
+                     nomatch=0),]
+
   id <- list()
   if (length(upstreamIDs)!=0){
     names(upstreamIDs) <- LETTERS[2:(length(upstreamIDs)+1)]
-    id <- lapply(names(upstreamIDs), function(x) upstreamIDs[[x]] <- rep(x, length(upstreamIDs[[x]])))
+    id <- lapply(names(upstreamIDs),
+               function(x) upstreamIDs[[x]] <- rep(x, length(upstreamIDs[[x]])))
   }
   out@data$ID <- c("A",unlist(id))
   if (!missing(outputfile)){
-    rgdal::writeOGR(out, dsn=outputfile, layer=basename(outputfile),  driver='ESRI Shapefile')
+    rgdal::writeOGR(out, dsn=outputfile, layer=basename(outputfile),
+                    driver='ESRI Shapefile')
   }
  # out <- rgeos::gUnaryUnion(out, id=c("A",unlist(id)))
   return(out)
@@ -246,7 +258,8 @@ UpstreamHYBAS <- function(station, HYBAS, ignore.endorheic=F, fast=T, outputfile
 FindNearestRiverSegment <- function(spatialPoint, riverLines, HYBAS){
   if (!missing(HYBAS)){
     # (optional) clip rivers using hybas to speed up transformation
-    riverLines <- rgeos::gIntersection(HYBAS, rivers, byid = TRUE, drop_lower_td = TRUE)
+    riverLines <- rgeos::gIntersection(HYBAS, rivers, byid = TRUE,
+                                       drop_lower_td = TRUE)
     }
 
   # reproject rivers and point into UTM if necessary
@@ -350,7 +363,9 @@ CalculateNCA <- function(NCA, basin, projected.CRS){
 DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index,
                            DEM.source, saga.env, NCA, interactive=F,pourpoints,
                            default.to.HYB=F,
-                           projected.CRS="+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs", ...){
+                           projected.CRS="+proj=aea +lat_1=50 +lat_2=70 +lat_0=40
+                           +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83
+                           +units=m +no_defs", ...){
 
   station <- ReadStationInformation(station, con=con)
 
@@ -367,13 +382,22 @@ DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index,
   no.upstream.hyb <- (length(HYB.Poly.individual) == 1)
 
   # Get first two upstream tiles (should be the first one for each ID)
-  first.up <- unlist(by(data = HYB.Poly.individual@data, INDICES = HYB.Poly.individual@data$ID,
-                     FUN = function(x) as.character(x[which.max(as.character(x$UP_AREA)),c("HYBAS_ID")])))
-  first.up.HYB <- HYB.Poly.individual[HYB.Poly.individual$HYBAS_ID %in% first.up & HYB.Poly.individual$ENDO != 2,]
-  first.up.HYB.endo <- HYB.Poly.individual[HYB.Poly.individual$HYBAS_ID %in% first.up,]
+  first.up <- unlist(by(
+    data = HYB.Poly.individual@data,
+    INDICES = HYB.Poly.individual@data$ID,
+    FUN = function(x)
+            as.character(x[which.max(as.character(x$UP_AREA)),c("HYBAS_ID")])))
+
+  first.up.HYB <- HYB.Poly.individual[HYB.Poly.individual$HYBAS_ID %in%
+                                      first.up & HYB.Poly.individual$ENDO != 2,]
+
+  first.up.HYB.endo <- HYB.Poly.individual[HYB.Poly.individual$HYBAS_ID %in%
+                                             first.up,]
 
   # find any endorheic basins
-  endo.HYB <- HYB.Poly.individual@data[HYB.Poly.individual$HYBAS_ID %in% first.up & HYB.Poly.individual$ENDO == 2,"ID"]
+  endo.HYB <- HYB.Poly.individual@data[HYB.Poly.individual$HYBAS_ID %in%
+                                 first.up & HYB.Poly.individual$ENDO == 2,"ID"]
+
   ID.list <- sapply(slot(HYB.Poly, "polygons"), function(x) slot(x, "ID"))
   endo <- ID.list %in% endo.HYB
 
@@ -383,7 +407,8 @@ DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index,
   # find necessary coverage for DEM TODO[NB]: Clean part this up: its a mess!
   if (!missing(DEM.index)){
     DEM.path <- OverlayDEM(rgeos::gUnaryUnion(first.up.HYB),
-                           tileindex=DEM.index, saga.env$workspace, saga.env$workspace, product = DEM.source,
+                           tileindex=DEM.index, saga.env$workspace,
+                           saga.env$workspace, product = DEM.source,
                            tilename="NTS_SNRC")
   }else{
     DEM.path <- OverlayDEM(geom1 = rgeos::gUnaryUnion(first.up.HYB),
@@ -394,8 +419,11 @@ DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index,
   }
 
   # Get upslope area from DEM
-  DEMresult <- UpslopeDEM(station, DEM.path = DEM.path, DEM.source=DEM.source, saga.env = saga.env,
-                         outdir = saga.env$workspace, projected.CRS=projected.CRS, ...)
+  DEMresult <- UpslopeDEM(station, DEM.path = DEM.path, DEM.source=DEM.source,
+                          saga.env = saga.env,
+                         outdir = saga.env$workspace,
+                         projected.CRS=projected.CRS, ...)
+
   if (DEMresult$nodata==T){ # if the point has no data
     DEM.poly.p <- sp::spTransform(HYB.Poly, CRS = sp::CRS(projected.CRS)) #use different CRS?
   }
@@ -408,8 +436,13 @@ DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index,
   DEM.Poly.p <- DEM.Poly.p[which.max(raster::area(DEM.Poly.p)),] # take the big one.  others will likely have bad geometries
 
   # Clip 'nose' of basin
-  HP.p <- sp::spTransform(HYB.Poly, CRSobj = sp::CRS(DEM.Poly.p@proj4string@projargs))
-  local.drainage.p <- rgeos::gIntersection(HP.p[1,], DEM.Poly.p, byid = F, drop_lower_td = TRUE) # DEM area within containing hybas
+  HP.p <- sp::spTransform(HYB.Poly,
+                          CRSobj = sp::CRS(DEM.Poly.p@proj4string@projargs))
+
+  local.drainage.p <- rgeos::gIntersection(HP.p[1,],
+                                           DEM.Poly.p,
+                                           byid = F,
+                                           drop_lower_td = TRUE) # DEM area within containing hybas
 
 
   #=====================
@@ -421,7 +454,9 @@ DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index,
     disjoint <- rgeos::gDisjoint(HP.p, local.drainage.p, byid = T)
 
     # if calculated total upslope area is less than half of an upslope HYBAS region, remove that HYBAS region
-    not.unlikely <- raster::area(DEM.Poly.p) > 0.5*raster::area(sp::spTransform(first.up.HYB.endo, CRS(DEM.Poly.p@proj4string@projargs)))
+    not.unlikely <- raster::area(DEM.Poly.p) >
+      0.5*raster::area(sp::spTransform(first.up.HYB.endo,
+                                       CRS(DEM.Poly.p@proj4string@projargs)))
   }
 
   keep <- ID.list[(!disjoint | endo) & (not.unlikely | endo)]
@@ -477,7 +512,8 @@ DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index,
 
   # write output shapefile (rgdal::writeOGR)
   name <- paste(station$station_number, "_basin.shp")
-  rgdal::writeOGR(output, dsn=file.path(outdir, name), layer=name, driver="ESRI Shapefile")
+  rgdal::writeOGR(output, dsn=file.path(outdir, name), layer=name,
+                  driver="ESRI Shapefile")
 
   # write output table (optional?)
   tablename <- paste(station$station_number, "_basin.csv")
@@ -486,7 +522,12 @@ DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index,
   #clean up (optional?)
  # file.remove(DEM.Poly)
 
-  return(list(includedHYB=HP.out, dem.local=local.drainage.p, out=output, orig.DEM=DEM.Poly.p, allHYB=HP.p))
+  return(list(
+    includedHYB=HP.out,
+    dem.local=local.drainage.p,
+    out=output,
+    orig.DEM=DEM.Poly.p,
+    allHYB=HP.p))
 }
 
 #===============================================================================
