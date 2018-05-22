@@ -263,7 +263,7 @@ ParseStationName <- function(station_name){
 #===============================================================================
 #' @title Geometry of waterbody from station name
 #'
-#' @desciption Attempts to figure out the geometry of a waterbody (point, polygon,
+#' @description Attempts to figure out the geometry of a waterbody (point, polygon,
 #' line) based on its name
 #'
 #' @param name name of waterbody

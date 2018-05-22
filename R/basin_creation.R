@@ -110,48 +110,66 @@ CombineWatersheds <- function(station, shedspoly_folder, dempoly_folder,
   # find DEM polygon in folder
   DEM_shp <- list.files(dempoly_folder, pattern = paste0(station, ".*\\.shp$"),
                         full.names = T)
-  if (length(DEM_shp)>1){warnings("Multiple DEM polygons found. Using the
+  if (length(DEM_shp) > 1){warnings("Multiple DEM polygons found. Using the
                                   first one.")}
-  DEM <- rgdal::readOGR(DEM_shp[1])
-  DEM_data_csv <- list.files(dempoly_folder, pattern = paste0(station, ".*\\.csv$"),
-                             full.names = T)
-  DEM_data <- read.csv(DEM_data_csv)
+  if (length(DEM_shp) == 0){
+    file_out <- file.path(out_folder, paste0(station,"_cntrb_basin_HYBonly.shp"))
+    output <- rgeos::gUnaryUnion(HYB[-which.max(HYB$UP_AREA),])
+    output <- sp::SpatialPolygonsDataFrame(output,
+                                           data=data.frame(station_number=station,
+                                                           pointbuffer=NA,
+                                                           nodata=NA,
+                                                           snap.dist=NA,
+                                                           DEM='None',
+                                                           cell_acc=NA,
+                                                           method='HYB Only',
+                                                           area=area(output)))
+    warnings(sprintf("station %s has no DEM data.  HYBAS data used"))
 
-  # reproject DEM polygon
-  DEM <- sp::spTransform(DEM, CRSobj = CRS(HYB@proj4string@projargs))
+  }else{
+    DEM <- rgdal::readOGR(DEM_shp[1])
+    DEM_data_csv <- list.files(dempoly_folder, pattern = paste0(station, ".*\\.csv$"),
+                               full.names = T)
+    DEM_data <- read.csv(DEM_data_csv)
+
+    # reproject DEM polygon
+    DEM <- sp::spTransform(DEM, CRSobj = CRS(HYB@proj4string@projargs))
 
 
-  # Perform set operations
-  A = HYB[-which.max(HYB$UP_AREA),]
-  C = HYB[which.max(HYB$UP_AREA),]
+    # Perform set operations
+    A = HYB[-which.max(HYB$UP_AREA),]
+    C = HYB[which.max(HYB$UP_AREA),]
 
-  output <- rgeos::gIntersection(DEM, HYB)
-  if (nrow(A)!=0){output <- rgeos::gUnion(output, A)}
+    output <- rgeos::gIntersection(DEM, HYB)
+    if (nrow(A)!=0){output <- rgeos::gUnion(output, A)}
 
-  # remove 'floating' polygons
-  output <- sp::disaggregate(output)
-  output <- output[which.max(lapply(output@polygons, slot, name='area')),]
+    # remove 'floating' polygons
+    output <- sp::disaggregate(output)
+    output <- output[which.max(lapply(output@polygons, slot, name='area')),]
 
-  # remove holes (inner rings)
-  output <- outerRing(output)
+    # remove holes (inner rings)
+    output <- outerRing(output)
 
-  # add in data to attributes table
-  data <- DEM_data[,c('station_number', 'pointbuffer', 'nodata', 'snap.dist',
-                      'DEM', 'cell_acc', 'method')]
-  data$area <- round(raster::area(output)*1e-6,2)
-  rownames(data) <- sapply(output@polygons, slot, name='ID')
-  output <- SpatialPolygonsDataFrame(output, data)
+    # add in data to attributes table
+    data <- DEM_data[,c('station_number', 'pointbuffer', 'nodata', 'snap.dist',
+                        'DEM', 'cell_acc', 'method')]
+    data$area <- round(raster::area(output)*1e-6,2)
+    rownames(data) <- sapply(output@polygons, slot, name='ID')
+    output <- SpatialPolygonsDataFrame(output, data)
 
-  output <- sp::spTransform(output,
-              CRSobj = CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
+    output <- sp::spTransform(output,
+                              CRSobj = CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
+
+    file_out <- file.path(out_folder, paste0(station,"_cntrb_basin.shp"))
+  }
 
   # write output
-  file_out <- file.path(out_folder, paste0(station,"_cntrb_basin.shp"))
   rgdal::writeOGR(obj = output,
            dsn = file_out,
            layer = basename(file_out),
            driver = 'ESRI Shapefile')
   write.csv(output@data, sub("shp$", "csv", file_out), row.names=F, quote=F)
+  print('done')
   }
 
 #===============================================================================
