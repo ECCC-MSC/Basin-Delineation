@@ -1,10 +1,8 @@
-library(data.table)
-
 #===============================================================================
 #' @title Set upstream station
 #'
 #'
-#' @description
+#' @description For a target station, sets a list of stations as 'upstream'
 #'
 #' @param station name of a target station for which upstream stations are to
 #' be defined.
@@ -23,7 +21,7 @@ library(data.table)
 #'
 #'  @export
 #===============================================================================
-set_upstream <- function(station, table, upstream){
+set_upstream <- function(station, table, upstream, set_to=1){
   if (station %in% upstream){
     stop("A station cannot be upstream of itself")
   }
@@ -33,20 +31,128 @@ set_upstream <- function(station, table, upstream){
     return()
   }
     test <- names(table) %in% upstream
-    table[station, names(table)[test] := 1]
+    table[station, names(table)[test] := set_to]
 }
 
-set_upstream_recursive <- function(station, table, next_upstream){
-  # for each station s in upstream S:
-  # find all stations upstream of s and add to L
-  # set_upstream for L
-  return()
+#===============================================================================
+#' @title Set downstream station
+#'
+#'
+#' @description For a target station, sets a list of stations as 'downstream'
+#'
+#' @param station name of a target station for which downstream stations are to
+#' be defined.
+#'
+#' @param table a data.table describing upstream / downstream relationships between
+#' stations.
+#'
+#' @param upstream a character vector of stations in table that are downstream of
+#' the target station.
+#'
+#' @return Does not return a value, the table is modified in-place.
+#'
+#' @examples
+#' r <- initialize_matrix_from_stations(c('stn1', 'stn2', 'stn3'))
+#' set_downstream('stn1', r, 'stn2')
+#'
+#'  @export
+#===============================================================================
+set_downstream <- function(station, table, downstream, set_to=1){
+  x <- lapply(downstream, set_upstream, table=table, upstream=station, set_to=set_to)
+  table #if this is missing the next call of the table will return nothing
 }
 
-set_downstream_recursive <- function(){
-  return()
+#===============================================================================
+#' @title Recursively set upstream stations
+#'
+#' @description recursively sets all stations upstream of a target station
+#'
+#' @param station target station to set
+#'
+#' @param table a data.table describing upstream / downstream relationships between
+#' stations.
+#'
+#' @param next_upstream the next station upstream of the target station
+#'
+#' @examples
+#' M  <- initialize_matrix_from_stations(c('stn1', 'stn2', 'stn3', 'stn4'))
+#' set_upstream('stn1', M, c('stn2', 'stn3'))
+#' set_upstream_recursive('stn4', M, 'stn1')
+#===============================================================================
+set_upstream_recursive <- function(station, table, next_upstream, set_to=1){
+  # get all upstream of next_upstream
+  all_up <- get_upstream(next_upstream, table)
+
+  # Set all stations upstream of next_upstream as upstream of target station
+  set_upstream(station, table, c(next_upstream, all_up), set_to=set_to)
 }
 
+#===============================================================================
+#' @title Recursively set downstream stations
+#'
+#' @description recursively sets all stations downstream of a target station
+#'
+#' @param station target station to set
+#'
+#' @param table a data.table describing upstream / downstream relationships between
+#' stations.
+#'
+#' @param next_downstream the next station downstream of the target station
+#'
+#' @examples
+#' M  <- initialize_matrix_from_stations(c('stn1', 'stn2', 'stn3', 'stn4', 'stn5'))
+#' set_upstream('stn1', M, c('stn2', 'stn3', 'stn4'))
+#' set_upstream('stn2', M, 'stn3')
+#' set_downstream_recursive('stn5', M, 'stn3')
+#' get_downstream('stn5', M)
+#===============================================================================
+set_downstream_recursive <- function(station, table, next_downstream, set_to){
+  # get all downstream of next_downstream
+  all_down <- get_downstream(next_downstream, table)
+
+  # Set target station as upstream of
+  set_downstream(station, table = table,
+                 downstream=c(all_down, next_downstream), set_to=set_to)
+}
+
+#===============================================================================
+#' @title Set relative position of station
+#'
+#' @description, given the next-upstream and next-downstream stations, set
+#' all up- and downstream stations as appropriate.
+#'
+#' @param station target station for which upstream-downstream relations
+#' are to be set
+#'
+#' @param table a data.table describing upstream / downstream relationships between
+#' stations.
+#' @param next_upstream (optional) the next station upstream of the target
+#' station. If omitted, no upstream stations will be set.
+#'
+#' @param next_downstream (optional) the next station downstream of the target
+#'  station. If omitted, no upstream stations will be set.
+#'
+#' @examples
+#' M  <- initialize_matrix_from_stations(c('stn1', 'stn2', 'stn3', 'stn4','stn5'))
+#' set_upstream('stn1', M, c('stn2', 'stn3', 'stn4'))
+#' set_upstream('stn2', M, c('stn3', 'stn4'))
+#' set_upstream('stn3', M, 'stn4')
+#' set_relative_position('stn5', M, next_upstream='stn3', next_downstream='stn2')
+#' get_upstream('stn5', M)
+#' get_downstream('stn5', M)
+
+#===============================================================================
+set_relative_position <- function(station, table,
+                                     next_upstream, next_downstream){
+  if (!missing(next_upstream) & !is.na(next_upstream)){
+    set_upstream_recursive(station=station, table=table,
+                           next_upstream = next_upstream)
+  }
+  if (!missing(next_downstream) & !is.na(next_downstream)){
+    set_downstream_recursive(station = station, table = table,
+                             next_downstream = next_downstream)
+  }
+}
 
 #===============================================================================
 #' @title Get upstream stations
@@ -64,7 +170,7 @@ set_downstream_recursive <- function(){
 #' @examples
 #' r <- initialize_matrix_from_stations(c('stn1', 'stn2', 'stn3'))
 #' set_upstream('stn1', r, 'stn2')
-#' get_upstream('stn2', r)
+#' get_upstream('stn1', r)
 #'
 #' @export
 #===============================================================================
@@ -97,7 +203,7 @@ get_upstream <- function(station, table){
 get_downstream <- function(station, table){
   downstream <- as.logical(table[, station, with=F] == 1)
   result <- table[, 'ID', with=F][downstream]
-  return(result)
+  return(result[[1]])
 }
 
 #===============================================================================
@@ -138,7 +244,7 @@ most_downstream <- function(table, diagnl=9){
 #' @param diagnl integer used along the diagonal of the matrix to indicate
 #' station identity (neither upstream nor downstream)
 #'
-#' @return an [n x n+1] data.table
+#' @return an [n × n+1] data.table
 #'
 #' @examples
 #' r <- initialize_matrix_from_stations(c('stn1', 'stn2', 'stn3'))
@@ -157,16 +263,13 @@ initialize_matrix_from_stations <- function(stations, diagnl=9){
 }
 
 
-b = initialize_matrix_from_stations(c('st3', 'st9'))
-set_upstream('st3', b, 'st9')
-#d = initialize_matrix_from_stations(c(names(a)[-1], names(b)[-1]), setorder=F)
 #===============================================================================
 #' @title Add station to upstream table
 #'
 #' @description Creates a new table w.  Because of the limitations of the
 #' data.table object on which the upstream-downstream tables are based, the object
-#' is not modified in-place, and a new object must be created.  A practical workaround
-#' is to assign the new table object the same name as the old table
+#' is not modified in-place. Instead, a new object must be created.  A practical
+#' workaround is to assign the new table object the same name as the old table
 #'
 #' @param stations a list of station names to be added to the table
 #'
@@ -181,6 +284,7 @@ set_upstream('st3', b, 'st9')
 #' @export
 #===============================================================================
 add_station_to_table <- function(stations, table){
+  table <- data.table::copy(table)
 
   #create new rows
   newstn <- initialize_matrix_from_stations(stations)
@@ -191,16 +295,14 @@ add_station_to_table <- function(stations, table){
   # create new columns in existing table
   table[,paste0(stations) := 0]
 
-  # add
+  # combine rows together
   out <- rbindlist(list(table, newrows), use.names = T)
   setkey(out, "ID")
   setcolorder(out, c("ID", out[,ID]))
+
   return(out)
 }
 
-set_upstream('st2', a, c( 'st8'))
-set_upstream('st4', a, c('st5'))
-a <- add_station_to_table(c('st123', 'st335'), a)
 
 #===============================================================================
 #'@title Check transitivity of station matrix
@@ -225,20 +327,45 @@ a <- add_station_to_table(c('st123', 'st335'), a)
 check_transitivity <- function(table){
   M <- as.matrix(table[,-1]) # get numeric part of table
   M <- -M * (diag(nrow(M)) - 1) # set diagonal to zero
+
+  # Find which entries in M violate transitivity assumption
   intransitive <- M != 0 | (M == 0 & ((M - M %*% M) == 0))
+
+  #return names that correspond to FALSE values in intransitive
   out <- apply(intransitive, 1, function(x) table[["ID"]][!x])
   names(out) <- table[["ID"]]
   out <- out[lapply(out, length) > 0]
   return(out)
 }
 
+#===============================================================================
+#'@title Check symmetry of station matrix
+#'
+#' @description  Finds all monitoring stations that violate the assumption
+#'of antisymmetry for upstream/downstream relations.
+#'
+#' @details The antisymmetry assumption states that if x is upstream of y then
+#' y is not upstream of x
+#'
+#' @param table: a data table created from initialize_matrix_from_stations. An
+#'(n x n+1) data.table with first column named "ID" and all other columns
+#'named according to station number. Row i and column i+1 should correspond to
+#'the same station.
+#'
+#' @return A list with an element for every x,y station pair that violates
+#' the antisymmetry assumption
+#'
+#' @export
+#===============================================================================
 check_symmetry <- function(table){
   M <- as.matrix(table[,-1]) # get numeric part of table
   M <- -M*(diag(nrow(M))-1) # set diagonal to zero
+
+  # Find all entries in M where a station is both upstream and downstream of another station
   symmetric <-  (M == 1 & t(M) == 1)
   out <- apply(symmetric, 1, function(x) table[["ID"]][x])
   names(out) <- table[["ID"]]
-  out <- out[lapply(out,length)>0]
+  out <- out[lapply(out,length) > 0]
   return(out)
 }
 
