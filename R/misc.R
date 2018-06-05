@@ -371,8 +371,8 @@ SnapToNearest <- function(point, lines){
 #'
 #' @param headerY character, column name containing y coordinate information
 #'
-#' @param CRS (optional) character, proj4 string specifying the projection information of the points. If missing,
-#' the default is WGS84
+#' @param CRS (optional) character, proj4 string specifying the projection
+#' information of the points. If missing, the default is WGS84
 #'
 #' @return SpatialPointsDataFrame
 #'
@@ -385,7 +385,7 @@ SpatialCSV <- function(file, headerX, headerY, CRS, ID){
   CRS <- sp::CRS(CRS)
   file.data <- read.csv(file, stringsAsFactors = F)
   if (!missing(ID)){
-    if ('station_number' %in% names(file.data)){
+    if ('station_number' %in% names(file.data) & 'ID' != 'station_number'){
       warning("station_number column has been overwritten")
     }
     file.data$station_number <- file.data[,ID]
@@ -540,3 +540,49 @@ pad <- function(text, pads, rpads){
   }
 }
 
+#'
+#' @title fill in gaps between
+#' @param station spatialpoint*
+#' @param basin spatialpolygon* of
+#' @param hybas spatialpolygon* corresponding to
+#' @param additive whether to add gaps to basin or subtract the downstream gap
+#' from the containing hydrobasin
+fill_upstream_gaps <- function(station, basin, hybas, additive=T){
+  albers <- sp::CRS("+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")
+  bprj <- basin@proj4string
+  if (!grepl('units=m', hybas@proj4string@projargs)){
+    hybas <- sp::spTransform(hybas, albers)
+  }
+  if (!grepl('units=m', station@proj4string@projargs)){
+    station <- sp::spTransform(station, albers)
+  }
+  if (!grepl('units=m', basin@proj4string@projargs)){
+    basin <- sp::spTransform(basin, albers)
+  }
+
+  P <- rgeos::gBuffer(station, width=50)
+  downstream <- sp::disaggregate(gDifference(hybas, basin))
+  int <- rgeos::gIntersects(downstream, rgeos::gBuffer(station, width=50), byid=T)
+
+  if (additive){
+    ## additive approach (fill in gaps)
+    final <- rgeos::gUnion(basin, downstream[!int])
+  }else{
+    ## subtractive approach (subtract whatever is below the station)
+    final <- rgeos::gDifference(hybas, downstream[int])
+  }
+
+  # try to clean geometries
+  final <- invisible(clgeo_Clean(final))
+  final <- rgeos::gBuffer(final, width=0)
+
+  #return object similar to original basin object
+  if ('data' %in% slotNames(basin)){
+    final <- spChFIDs(final, row.names(basin@data))
+    final <- SpatialPolygonsDataFrame(final, basin@data)
+  }
+  if (bprj@projargs != basin@proj4string@projargs){
+    final <- sp::spTransform(final, bprj)
+  }
+  return(final)
+}

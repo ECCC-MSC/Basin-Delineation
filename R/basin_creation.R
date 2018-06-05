@@ -98,7 +98,7 @@ HYBASBasinLimits <- function(df, HYBAS, code, outdir,
 #' @export
 #===============================================================================
 CombineWatersheds <- function(station, shedspoly_folder, dempoly_folder,
-                              out_folder){
+                              out_folder, station_point){
   if (!class(station)=='character'){stop("station should be a character string")}
   # find hydrobasins polygon in folder
   HYB_shp <- list.files(shedspoly_folder, pattern = paste0(station, ".*\\.shp$"),
@@ -110,8 +110,6 @@ CombineWatersheds <- function(station, shedspoly_folder, dempoly_folder,
   # find DEM polygon in folder
   DEM_shp <- list.files(dempoly_folder, pattern = paste0(station, ".*\\.shp$"),
                         full.names = T)
-  if (length(DEM_shp) > 1){warnings("Multiple DEM polygons found. Using the
-                                  first one.")}
   if (length(DEM_shp) == 0){
     file_out <- file.path(out_folder, paste0(station,"_cntrb_basin_HYBonly.shp"))
     output <- rgeos::gUnaryUnion(HYB[-which.max(HYB$UP_AREA),])
@@ -127,7 +125,10 @@ CombineWatersheds <- function(station, shedspoly_folder, dempoly_folder,
     warnings(sprintf("station %s has no DEM data.  HYBAS data used"))
 
   }else{
+    if (length(DEM_shp) > 1){warnings("Multiple DEM polygons found. Using the
+                                  first one.")}
     DEM <- rgdal::readOGR(DEM_shp[1])
+
     DEM_data_csv <- list.files(dempoly_folder, pattern = paste0(station, ".*\\.csv$"),
                                full.names = T)
     DEM_data <- read.csv(DEM_data_csv)
@@ -149,6 +150,13 @@ CombineWatersheds <- function(station, shedspoly_folder, dempoly_folder,
 
     # remove holes (inner rings)
     output <- outerRing(output)
+
+    # for basins that terminate within the hydrobasin, remove erroneous gaps
+    if (nrow(A) == 0 & !missing(station_point)){
+      output <- fill_upstream_gaps(station = station_point, basin = output,
+                                   hybas = C)
+    }
+
 
     # add in data to attributes table
     data <- DEM_data[,c('station_number', 'pointbuffer', 'nodata', 'snap.dist',
