@@ -248,7 +248,7 @@ CompileDEM <- function(DEM, DEM.dir, output.dir, force.50k=F, product='CDED'){
   files <- DownloadMultipleDEM(DEM=DEM, DEM.dir=DEM.dir, force.50k=force.50k,
                                product=product)
   dstfile <- file.path(output.dir, "NTS_mosaic.sdat")
-  gdal_mosaic(srcfiles = files, dstfile = dstfile, of = "SAGA",srcnodata = -32767)
+  gdal_mosaic(srcfiles = files[file.exists(files)], dstfile = dstfile, of = "SAGA",srcnodata = -32767)
   output <- gdal_warp2SAGA(dstfile, srcnodata=-32768,
                  outputCRS="+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96
                  +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")
