@@ -1,4 +1,3 @@
-#con <- dbConnect(RSQLite::SQLite(), "M:\\trasnfer\\Hydat_august\\Hydat.sqlite3")
 #==============================================================================
 #' @title Calculate Length of Longitudinal Degree
 #'
@@ -6,9 +5,9 @@
 #'
 #' @param lat  numeric vector - northing of location (degrees or decimal degrees)
 #'
-#' @param lat.m (optional) numeric vector - northing of location, minutes (if lat is not specified in decimal degrees)
+#' @param lat_m (optional) numeric vector - northing of location, minutes (if lat is not specified in decimal degrees)
 #'
-#' @param lat.s (optional) numeric vector - northing of location, seconds (if lat is not specified in decimal degrees)
+#' @param lat_s (optional) numeric vector - northing of location, seconds (if lat is not specified in decimal degrees)
 #'
 #' @return numeric vector of lengths  (measured in kilometres)
 #'
@@ -18,21 +17,21 @@
 #'
 #' @export
 #==============================================================================
-LongitudeLength <- function(lat, lat.m, lat.s){
-  lon.at.eq = 111.321
+LongitudeLength <- function(lat, lat_m, lat_s){
+  lon_at_eq <- 111.321
   mm <- 0
   ss <- 0
-  if (!missing(lat.m)){
-    mm <- lat.m/60
+  if (!missing(lat_m)){
+    mm <- lat_m / 60
   }
-  if (!missing(lat.s)){
-    ss <- lat.s/3600
+  if (!missing(lat_s)){
+    ss <- lat_s / 3600
   }
-  lat.dd <- lat + mm + ss
-  lat.rad <- lat.dd * pi/180
+  lat_dd <- lat + mm + ss
+  lat_rad <- lat_dd * pi / 180
 
-  lon.km = cos(lat.rad) * lon.at.eq
-  return(lon.km)
+  lon_km <- cos(lat_rad) * lon_at_eq
+  return(lon_km)
 }
 
 #==============================================================================
@@ -52,21 +51,22 @@ LongitudeLength <- function(lat, lat.m, lat.s){
 #' @export
 #==============================================================================
 WhichZone <- function(long){
-  zone <- (floor((long + 180)/6) %% 60) + 1
+  zone <- (floor( (long + 180) / 6) %% 60) + 1
   return(zone)
 }
 
 #==============================================================================
-#' Get index of HydroSHEDS DEM tile
+#' @title Get name of HydroSHEDS DEM tile
 #'
 #'
-#' @description returns the name of a HYDROSHEDS tiled data file name based on the coordinates of a point
+#' @description returns the name of a HYDROSHEDS tiled data file name based on
+#' the coordinates of a point
 #'
 #' @param long numeric longitude
 #'
 #' @param lat numeric latitude
 #'
-#' @param fext file extension for output filename (needs leading '.')
+#' @param fext file extension for output filename
 #'
 #' @keywords internal
 #'
@@ -75,19 +75,24 @@ WhichZone <- function(long){
 #'
 #' @export
 #==============================================================================
-HydroTile <- function(long, lat, fext=''){
-  x <- floor(long/5)*5
-  y <- floor(lat/5)*5
-  xd <- ifelse(x<0, 'w', 'e')
-  yd <- ifelse(y<0, 's', 'n')
-  out <- sprintf("%s%02.2d%s%03.3d_con%s",yd, abs(y),xd, abs(x), fext)
+HydroTile <- function(long, lat, fext=""){
+  fext <- gsub("^([^\\.])", "\\.\\1", fext)
+
+  x <- floor(long / 5) * 5
+  y <- floor(lat / 5) * 5
+  if (y >= 60){stop("No HydroSHEDS data north of 60 degrees")}
+  xd <- ifelse(x < 0, "w", "e")
+  yd <- ifelse(y < 0, "s", "n")
+  out <- sprintf("%s%02.2d%s%03.3d_con%s", yd, abs(y), xd, abs(x), fext)
+
   return(out)
 }
 
+#==============================================================================
 #' Find all hydroSHEDS tiles within a distance of a point
 #'
-#' @description Finds all HydroSHEDS DEM tiles within a specified tolerance of a point.  To be used
-#' with 3 arc-second hydrologically conditioned DEM.
+#' @description Finds all HydroSHEDS DEM tiles within a specified tolerance of
+#' a point.  To be used with 3 arc-second hydrologically conditioned DEM.
 #' @param long longitude in decimal degrees
 #' @param lat latitude in decimal degrees
 #' @param tol Tolerance in m to consider
@@ -96,33 +101,64 @@ HydroTile <- function(long, lat, fext=''){
 #' @examples
 #' HydroMosaic(-115, 52, 50000)
 #' @export
+#==============================================================================
+# HydroMosaic <- function(long, lat, tol, ...){
+#   tol <- tol * 0.001 # convert tolerance to km
+#   LL <- LongitudeLength(lat)
+#   grids <- HydroTile(long, lat, ...)
+#
+#   # check all sides for proximity, add grids if necessary
+#
+#   if ( (lat - floor(lat / 5) * 5) * 111 < tol){
+#     # too close to bottom
+#     grids <- c(grids, HydroTile(long, lat - 5, ...))
+#   }else if ( (ceiling(lat / 5) * 5 - lat) * 111 < tol){
+#     # too close to top
+#     grids <- c(grids, HydroTile(long, lat + 5, ...))
+#   }
+#
+#   if ( (long - floor(long / 5) * 5) * LL < tol){
+#     # too far west
+#     grids <- c(grids, HydroTile(long - 5, lat, ...))
+#   }else if ( (ceiling(long / 5) * 5 - long) * LL < tol){
+#     grids <- c(grids, HydroTile(long + 5, lat, ...))
+#   }
+#
+#   return(grids)
+# }
+
 HydroMosaic <- function(long, lat, tol, ...){
-  tol <- tol * 0.001 # convert to km
-  LL <- LongitudeLength(lat)
-  grids <- HydroTile(long, lat, ...)
+  tol   <- tol * 0.001 # convert tolerance to km
+  # convert to degrees
+  toly  <- tol / 111
+  tolx  <- tol / LongitudeLength(lat)
 
   # check all sides for proximity, add grids if necessary
-  if ((lat - floor(lat / 5) * 5) * 111 < tol){ # too close to bottom
-    grids <- c(grids, HydroTile(long, lat - 5, ...))
-  }else if ((ceiling(lat / 5) * 5 - lat) * 111 < tol){ # too close to top
-    grids <- c(grids, HydroTile(long, lat + 5, ...))
-  }
-  if ((long-floor(long / 5) * 5) * LL < tol){ # too far west
-    grids <- c(grids, HydroTile(long - 5, lat, ...))
-  }else if ((ceiling(long / 5) * 5 - long)*LL < tol){
-    grids <- c(grids, HydroTile(long + 5, lat, ...))
-  }
+  xmin <- floor((long - tolx) / 5) * 5
+  xmax <- floor((long + tolx) / 5) * 5
+
+  xrange <- seq(xmin, xmax, 5)
+  yrange <- seq(floor((lat - toly) / 5) * 5, floor((lat + toly) / 5) * 5, 5)
+
+  pairs <- expand.grid(xrange, yrange)
+
+  grids <- apply(pairs, 1, function(x) HydroTile(x[1], x[2]))
+  print(grids)
   return(grids)
 }
+
 
 #' Get Mosaic Extent
 #'
 #' @param names names of mosaic file
 GetMosaicLimits <- function(names){
-  names <- gsub("_con.*", "", names)
-  names <- gsub("[ns]", "", names)
-  names <- gsub("[ew]", ",", names)
-  names <- strsplit(names,",")
+
+  names <- gsub("_con.*", "",  names)
+  names <- gsub("[ns]",   "",  names)
+  names <- gsub("[ew]",   ",", names)
+
+  names <- strsplit(names, ",")
+
   return(names)
 }
 
@@ -141,10 +177,10 @@ GetMosaicLimits <- function(names){
 #==============================================================================
 read.sgrd.header <- function(file){
   # get .sgrd grid info from ascii header
-  data <- read.table(file, sep=c('='), strip.white = T, stringsAsFactors = F)
-  output <- data.frame(t(data[,2]), stringsAsFactors = F)
-  names(output) = data[,1]
-  #output <- lapply(output, type.convert)
+  data <- read.table(file, sep = c("="), strip.white = T, stringsAsFactors = F)
+  output <- data.frame(t(data[, 2]), stringsAsFactors = F)
+  names(output) <- data[, 1]
+
   return(output)
 }
 
@@ -165,8 +201,8 @@ read.sgrd.header <- function(file){
 GetProj4 <- function(x){
   return(
     switch(x,
-      "WGS84"="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs",
-      "AlbersEqualAreaConic"="+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs"
+      "WGS84" = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs",
+      "AlbersEqualAreaConic" = "+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs"
     )
   )
 }
@@ -184,21 +220,21 @@ GetProj4 <- function(x){
 #==============================================================================
 NearestHYBAS <- function(station){
   if (!grepl("^\\d{2}[[:alpha:]]{2}\\d{3}", station)){
-    return(seq(100,999))
+    return(seq(100, 999))
   }
-  code = regmatches(x =station ,m = regexpr("^\\d{2}", station))
+  code <- regmatches(x = station, m = regexpr("^\\d{2}", station))
   basins <- switch(code,
-             "01"=c(723, 726),
-             "02"=c(725, 724, 723, 726),
-             "03"=c(721, 722, 723, 724),
-             "04"=c(713),
-             "05"=c(712),
-             "06"=c(711, 832, 833, 852, 851),
-             "07"=c(822),
-             "08"=c(783, 782),
-             "09"=c(811, 812),
-             "10"=c(812, 822, 823, 831, 841, 842, 843, 844, 861, 862, 863),
-             "11"=c(712, 742))
+             "01" = c(723, 726),
+             "02" = c(725, 724, 723, 726),
+             "03" = c(721, 722, 723, 724),
+             "04" = c(713),
+             "05" = c(712),
+             "06" = c(711, 832, 833, 852, 851),
+             "07" = c(822),
+             "08" = c(783, 782),
+             "09" = c(811, 812),
+             "10" = c(812, 822, 823, 831, 841, 842, 843, 844, 861, 862, 863),
+             "11" = c(712, 742))
   return(basins)
 }
 
@@ -208,19 +244,19 @@ NearestHYBAS <- function(station){
 #'
 #' @param names names of hydrosheds tiles (e.g. 'n45w060')
 #'
-#' @param DEM.dir character path pointing to directory containing hydrosheds
+#' @param DEM_dir character path pointing to directory containing hydrosheds
 #' tiles
 #'
 #' @return character, list of file paths for each of the tiles specified
 #' in the names parameter
-GetTilePathsHS <- function(names, DEM.dir){
-  original.DEM <- unlist(lapply(
-    names, list.files, path=DEM.dir, full.names = T, recursive = T,
+GetTilePathsHS <- function(names, DEM_dir){
+  original_DEM <- unlist(lapply(
+    names, list.files, path = DEM_dir, full.names = T, recursive = T,
     include.dirs = T))
 
-  original.DEM <- original.DEM[basename(original.DEM) ==
-                                 basename(dirname(original.DEM))]
-  return(original.DEM)
+  original_DEM <- original_DEM[basename(original_DEM) ==
+                                 basename(dirname(original_DEM))]
+  return(original_DEM)
 }
 
 #==============================================================================
@@ -233,20 +269,22 @@ GetTilePathsHS <- function(names, DEM.dir){
 #' @param tileindex either an R SpatialPolygonsDataFrame of the DEM tile index, or a character
 #' path pointing to such a shapefile
 #'
-#' @param tile.id.field Name of column in tileindex that gives DEM sheet number
+#' @param tileid_field Name of column in tileindex that gives DEM sheet number
 #'
 #' @export
 #'
 #' @keywords internal
 #==============================================================================
-TileIndex <- function(geom1, tileindex, tile.id.field){
+TileIndex <- function(geom1, tileindex, tileid_field){
   # read-in tile if filename is provided
   tile <- InterpretShapefile(tileindex)
+
   # check CRS, transform if necessary
-  geom1 <- SameCRS(geom1,tile)
+  geom1 <- SameCRS(geom1, tile)
+
   # get intersecting tile iDs
-  tiles <- over(geom1, tile, returnList = T)[[1]]
-  tiles <- tiles[,tile.id.field]
+  tiles <- sp::over(geom1, tile, returnList = T)[[1]]
+  tiles <- tiles[, tileid_field]
   return(as.character(tiles))
 }
 
@@ -269,6 +307,7 @@ SameCRS <- function(spgeom1, spgeom2){
   if (spgeom1@proj4string@projargs != spgeom2@proj4string@projargs){
     spgeom1 <- sp::spTransform(spgeom1, CRSobj = sp::CRS(spgeom2@proj4string@projargs))
   }
+
   return(spgeom1)
 }
 
@@ -289,16 +328,19 @@ SameCRS <- function(spgeom1, spgeom2){
 #' @keywords internal
 #==============================================================================
 InterpretShapefile <- function(x, use_sf=T, quiet=T){
-  if (class(x)=="character"){
+  if (class(x) == "character"){
+
     if (require(sf)){
       x <- sf::st_read(x, quiet=quiet)
-      x <- st_zm(x)  # drop Z and M dimensions
+      x <- sf::st_zm(x)  # drop Z and M dimensions
       x <- as(x, "Spatial")
     }else{
       x <- rgdal::readOGR(x, verbose=!quiet)
     }
+
     return(x)
   }
+
   if (grepl("Spatial", class(x))){
     return(x)
   }else{
@@ -328,10 +370,10 @@ ExpandBBox <- function(geom1, tol){
   geom1 <- sp::spTransform(geom1, GetProj4("WGS84"))
   box <- sp::bbox(geom1)
   dlat <- (tol * 1e-3) / 111
-  dlon <- (tol * 1e-3) / LongitudeLength(mean(box[2,]))
-  if (!(all(0 < abs(box[2,])) & all(abs(box[2,]) < 90))){stop()}
-  box.new <- box + c(-dlon, -dlat, dlon, dlat)
-  return(box.new)
+  dlon <- (tol * 1e-3) / LongitudeLength(mean(box[2, ]))
+  if ( !(all(0 < abs(box[2, ])) & all(abs(box[2, ]) < 90))){stop()}
+  box_new <- box + c(-dlon, -dlat, dlon, dlat)
+  return(box_new)
 }
 
 #==============================================================================
@@ -353,49 +395,13 @@ ExpandBBox <- function(geom1, tol){
 SnapToNearest <- function(point, lines){
   point <- SameCRS(point, lines) # put them in same CRS
   n <- rgeos::gNearestPoints(point, lines)[2]  #first element is original point
-  pointNew <- SpatialPointsDataFrame(coords=n@coords, data=point@data, proj4string = point@proj4string)
-  return(pointNew)
+  new_point <- SpatialPointsDataFrame(coords = n@coords, data = point@data,
+                                     proj4string = point@proj4string)
+
+  return(new_point)
 }
 
-#==============================================================================
-#' @title Create SpatialPointsDataFrame from csv
-#'
-#' @description Creates an R SpatialPointsDataFrame from a csv
-#'
-#' @param file path to *.csv file
-#'
-#' @param ID character, column name giving a unique ID for each entry. If Hydat 'station_number' entries are
-#' available for every station, this is the recommended column to use.
-#'
-#' @param headerX character, column name containing x coordinate information
-#'
-#' @param headerY character, column name containing y coordinate information
-#'
-#' @param CRS (optional) character, proj4 string specifying the projection
-#' information of the points. If missing, the default is WGS84
-#'
-#' @return SpatialPointsDataFrame
-#'
-#' @export
-#==============================================================================
-SpatialCSV <- function(file, headerX, headerY, CRS, ID){
-  if (missing(CRS)){
-    CRS <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
-  }
-  CRS <- sp::CRS(CRS)
-  file.data <- read.csv(file, stringsAsFactors = F)
-  if (!missing(ID)){
-    if ('station_number' %in% names(file.data) & 'ID' != 'station_number'){
-      warning("station_number column has been overwritten")
-    }
-    file.data$station_number <- file.data[,ID]
-  }else{
-    warning("Missing 'station_number' column. Unexpected behaviour may result with basin delineation tools")
-  }
-  coords <- file.data[,c(headerX, headerY)]
-  output <- SpatialPointsDataFrame(coords, data=file.data, proj4string = CRS)
-  return(output)
-}
+
 
 
 #==============================================================================
@@ -420,15 +426,15 @@ GraticuleIndices <- function(long, lat, tol, resolution=1){
   tol <- tol * 0.001 # convert to km
 
   LL <- LongitudeLength(lat)
-  dlat <- tol/111  #convert to degree
-  dlon <- tol/LL   #convert to degree
+  dlat <- tol / 111  #convert to degree
+  dlon <- tol / LL   #convert to degree
 
-  xrange <- c(long-dlon, long+dlon)
-  xrange <- floor(xrange/resolution)*resolution
+  xrange <- c(long - dlon, long + dlon)
+  xrange <- floor(xrange / resolution) * resolution
   xrange <- seq(min(xrange), max(xrange), resolution)
 
-  yrange <- c(lat-dlat, lat+dlat)
-  yrange <- ceiling(yrange/resolution)*resolution
+  yrange <- c(lat - dlat, lat + dlat)
+  yrange <- ceiling(yrange / resolution) * resolution
   yrange <- seq(min(yrange), max(yrange), resolution)
 
   out <- expand.grid(xrange, yrange)
@@ -437,16 +443,37 @@ GraticuleIndices <- function(long, lat, tol, resolution=1){
 }
 
 #==============================================================================
-#only works with points, and only works with lat/lon
+#only works with lat/lon
+
+#' @param geom1 geometry with which to cover with NED DEM tiles
+#'
+#' @param tol distance to buffer geometry
 #==============================================================================
-NEDcoverage <- function(geom1, tol, ...){
+NEDcoverage <- function(geom1, tol){
   if (grepl("units=m", geom1@proj4string@projargs)){
     geom1 <- sp::spTransform(geom1,
-                                CRSobj = sp::CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
+           CRSobj = sp::CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
   }
-  coords <- rgeos::gCentroid(geom1)@coords[1,]
-  ind <- GraticuleIndices(coords[1], coords[2], tol=tol, ...)
-  apply(ind, 1, function(x) USGSTileName(x[1], x[2]))
+
+    # for points
+    if (all(geom1@bbox[, 1] == geom1@bbox[, 2])){
+      coords <- rgeos::gCentroid(geom1)@coords[1, ]
+      ind <- GraticuleIndices(coords[1], coords[2], tol = tol, resolution = 1)
+
+
+      }else{
+      # for non-points
+      xrange <- c(seq(geom1@bbox[1, 1], geom1@bbox[1, 2], 1), geom1@bbox[1, 2]) # duplicate last to ensure its included
+      yrange <- c(seq(geom1@bbox[2, 1], geom1@bbox[2, 2], 1), geom1@bbox[2, 2])
+      allpts <- expand.grid(unique(xrange), unique(yrange))
+      ind <- apply(allpts, 1, function(x) GraticuleIndices(x[1], x[2], tol=tol, resolution = 1))
+      ind <- unique(do.call('rbind', ind))
+      }
+
+  # use graticule indices to build tile names
+  tiles <- apply(ind, 1, function(x) USGSTileName(x[1], x[2]))
+
+  return(as.character(tiles))
 }
 
 #==============================================================================
@@ -462,9 +489,9 @@ NEDcoverage <- function(geom1, tol, ...){
 #==============================================================================
 AddMissingColumns <- function(df, columns){
   missing.cols <- !(columns %in% names(df))
-  to.add <- as.data.frame(matrix(nrow=nrow(df),ncol=sum(missing.cols)))
-  names(to.add) <- columns[missing.cols]
-  df <- cbind(df, to.add)
+  to_add <- as.data.frame(matrix(nrow = nrow(df), ncol = sum(missing.cols)))
+  names(to_add) <- columns[missing.cols]
+  df <- cbind(df, to_add)
   return(df)
 }
 
@@ -487,83 +514,103 @@ AddMissingColumns <- function(df, columns){
 #==============================================================================
 outerRing <- function(poly){
   reduce <- function(x){
-    ringNumber <- which.max( # keep biggest ring
+    ring_num <- which.max( # keep biggest ring
     sapply(
-      x@polygons[[1]]@Polygons, slot, name='area'
+      x@polygons[[1]]@Polygons, slot, name = "area"
     ))
   original.ID <- sapply(slot(x, "polygons"), function(x) slot(x, "ID"))
   ring <- SpatialPolygons(
     list(
       Polygons(
         list(
-          x@polygons[[1]]@Polygons[[ringNumber]]
+          x@polygons[[1]]@Polygons[[ring_num]]
         ),
-        ID=original.ID)), proj4string = x@proj4string)
+        ID = original.ID)), proj4string = x@proj4string)
   return(ring)
   }
 
   if (length(poly@polygons) == 1){
     return(reduce(poly))
   }else if (length(poly@polygons) > 1){
-    L <- lapply(seq_along(poly), function(S) reduce(poly[S,]))
+    L <- lapply(seq_along(poly), function(S) reduce(poly[S, ]))
     L <- do.call(rbind, L)
     return(L)
     }
   }
 
+zeroBuffer <- function(SpatialObj, byid=TRUE){
 
-#==============================================================================
-#' @title Add character strings on either end of an input character string
-#'
-#' @param text input character string
-#'
-#' @param pads character string to append and prepend to text
-#'
-#' @param rpads (optional) if provided, adds different text on right-hand side
-#' of string.
-#'
-#' @return character string, original text with pads appended and prepended
-#'
-#' @examples
-#' pad('file', '00')
-#' pad('filename', '', '.csv')
-#'
-#' @export
-#'
-#' @keywords internal
-#==============================================================================
-pad <- function(text, pads, rpads){
-  if (missing(rpads)){
-    sprintf(paste('%s',text,'%s', sep=''), pads, pads)
-  }else{
-    sprintf(paste('%s',text,'%s', sep=''), pads, rpads)
-  }
+  if ("data" %in% slotNames(SpatialObj)){
+    fixed_geom <-rgeos::gBuffer(SpatialObj, width = 0, byid = byid)
+
+    f <- switch(class(SpatialObj),
+                "SpatialPolygonsDataFrame" = sp::SpatialPolygonsDataFrame,
+                "SpatialPointsDataFrame" = sp::SpatialPointsDataFrame,
+                "SpatialLinesDataFrame" = sp::SpatialLinesDataFrame)
+    out <- f(Sr = fixed_geom, data = SpatialObj@data)
+
+    }else{
+      out <- datargeos::gBuffer(SpatialObj, width = 0, byid = byid)
+    }
+   return(out)
 }
 
+
+#==============================================================================
+#' @title Fill gaps between catchment and HydroBASIN
 #'
-#' @title fill in gaps between
 #' @param station spatialpoint*
-#' @param basin spatialpolygon* of
-#' @param hybas spatialpolygon* corresponding to
+#'
+#' @param basin spatialpolygon* of contributing area basin, already clipped to hybas
+#'
+#' @param hybas spatialpolygon* corresponding to the entire hydrobasins boundary
+#'
 #' @param additive whether to add gaps to basin or subtract the downstream gap
 #' from the containing hydrobasin
-fill_upstream_gaps <- function(station, basin, hybas, additive=T){
-  albers <- sp::CRS("+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")
+#'
+#' @export
+#==============================================================================
+fill_upstream_gaps <- function(station, basin, hybas, additive=T,
+                               cl_strategy="POLYGONATION"){
+  print('filling upstream gaps')
+  albers <- sp::CRS("+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0
+                           +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")
   bprj <- basin@proj4string
-  if (!grepl('units=m', hybas@proj4string@projargs)){
+
+  # Ensure consistent projected CRS and good geometry
+  if (!grepl("units=m", hybas@proj4string@projargs)){
     hybas <- sp::spTransform(hybas, albers)
   }
-  if (!grepl('units=m', station@proj4string@projargs)){
+
+  if (!grepl("units=m", station@proj4string@projargs)){
     station <- sp::spTransform(station, albers)
   }
-  if (!grepl('units=m', basin@proj4string@projargs)){
+
+  if (!grepl("units=m", basin@proj4string@projargs)){
     basin <- sp::spTransform(basin, albers)
   }
 
-  P <- rgeos::gBuffer(station, width=50)
-  downstream <- sp::disaggregate(gDifference(hybas, basin))
-  int <- rgeos::gIntersects(downstream, rgeos::gBuffer(station, width=50), byid=T)
+  P <- rgeos::gBuffer(station, width = 50)
 
+  # Ensure basin is contained within hybas
+  basin <- rgeos::gIntersection(basin, hybas)
+
+  # split up 'gaps' between basin and containing hydrobasin
+  downstream <- sp::disaggregate(rgeos::gDifference(hybas, basin))
+  if (is.null(downstream)){
+    warning('Station does not intersect any Hydrobasin - delineation gaps.
+            Skipping gap-filling')
+    return(basin)
+  }
+
+  # Find out which gap contains the station (this one doesn't get filled)
+  int <- rgeos::gIntersects(downstream, rgeos::gBuffer(station, width = 100), byid = T)
+  if (is.null(nrow(int)) | all(!int)){
+    warning('Station does not intersect basin')
+    return(basin)
+  }
+
+  # Create new geometry with no gaps
   if (additive){
     ## additive approach (fill in gaps)
     final <- rgeos::gUnion(basin, downstream[!int])
@@ -573,16 +620,19 @@ fill_upstream_gaps <- function(station, basin, hybas, additive=T){
   }
 
   # try to clean geometries
-  final <- invisible(clgeo_Clean(final))
-  final <- rgeos::gBuffer(final, width=0)
+  final <- outerRing(final)
+  final <- invisible(cleangeo::clgeo_Clean(final, strategy = cl_strategy))
+  final <- rgeos::gBuffer(final, width = 0)
 
   #return object similar to original basin object
-  if ('data' %in% slotNames(basin)){
-    final <- spChFIDs(final, row.names(basin@data))
-    final <- SpatialPolygonsDataFrame(final, basin@data)
+  if ("data" %in% slotNames(basin)){
+    final <- sp::spChFIDs(final, row.names(basin@data))
+    final <- sp::SpatialPolygonsDataFrame(final, basin@data)
   }
+
   if (bprj@projargs != basin@proj4string@projargs){
     final <- sp::spTransform(final, bprj)
   }
+
   return(final)
 }

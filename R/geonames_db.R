@@ -36,13 +36,13 @@
 #' QueryGeogratisAPI(list(q='Ottawa', theme=985), format='csv')
 #===============================================================================
 CGNDBQueryAPI <- function(terms, format=NULL){
-  args <- lapply(names(terms), function(x) paste(x,'=',terms[x], sep=''))
-  args <- paste(unlist(args), collapse='&')
+  args <- lapply(names(terms), function(x) paste(x, "=", terms[x], sep = ""))
+  args <- paste(unlist(args), collapse = "&")
   base.url <- "http://geogratis.gc.ca/services/geoname/en/geonames"
   if (!is.null(format)){
-    base.url <- paste(base.url, '.', sep='')
+    base.url <- paste(base.url, ".", sep = "")
   }
-  query <- paste(base.url, format, "?", args, sep="")
+  query <- paste(base.url, format, "?", args, sep = "")
   return(query)
 }
 
@@ -61,7 +61,7 @@ CGNDBQueryAPI <- function(terms, format=NULL){
 #' @export
 #==============================================================================
 CGNDBDownloadAPI <- function(dstfile, terms, format){
-  url <- CGNDBQueryAPI(terms=terms, format=format)
+  url <- CGNDBQueryAPI(terms = terms, format = format)
   download.file(url = url, destfile = dstfile, quiet = FALSE, mode =  "wb",
                 cacheOK = TRUE)
   return(dstfile)
@@ -88,79 +88,86 @@ CGNDBDownloadAPI <- function(dstfile, terms, format){
 #' @return a Spatial* object
 #===============================================================================
 CGNDBHydroKML <- function(station, dstfile){
-  if (!class(station)=='character'){
+
+  if (!class(station) == "character"){
     stn_name <- station@data$station_name
   }else{
     stn_name <- station
   }
+
   name <- ParseStationName(stn_name)
   geom <- StationNameGeometry(name)
-  if (geom=="LINE"){
-    concise="RIV"
-  }else if(geom=="POLYGON"){
-    concise="LAKE"
+
+  if (geom == "LINE"){
+    concise <- "RIV"
+  }else if (geom == "POLYGON"){
+    concise <- "LAKE"
   }
-  file <- CGNDBDownloadAPI(dstfile=dstfile,
-                           terms=list(q=name, theme=979,
-                                               concise=concise), format='kml')
+  file <- CGNDBDownloadAPI(dstfile = dstfile,
+                           terms = list(q = name, theme = 979,
+                                          concise = concise), format = "kml")
   file <- FilterKMLGeometry(file, tolower(geom))
 
-  if (is.null(file)){return(NULL)}
-  shape <- readOGR(file)
+  if (is.null(file)){ return(NULL) }
+
+  shape <- rgdal::readOGR(file)
 
   return(shape)
 }
 
 #===============================================================================
-#' @title Convert KML to shapefile
+#' @title Convert KML to shapefile, retaining only one geometry type
 #'
 #' @param kml.file character path to kml file
 #'
 #' @param geom character string, which feature type do you want to retain? options
 #' are one of ('point', 'line', 'polygon').
 #'
-#' @param tryAlternate logical, if no features of the desired type are found,
+#' @param try_alternate logical, if no features of the desired type are found,
 #' whether or not to try loading a different feature type.
 #'
-#' @return character, path to shapefile
+#' @return character, path to newly created shapefile
 #===============================================================================
-FilterKMLGeometry <- function(kml.file, geom, tryAlternate=T){
+FilterKMLGeometry <- function(kml.file, geom, try_alternate=T){
   geom <- tolower(geom)
 
   # make sure a feature of the desired type exists...
-  feat.kml <- suppressWarnings(readLines(kml.file))
-  geom.kml <- switch(geom,
-                     'point' ='<Point>',
-                     'line'="<LineString>",
-                     'polygon'="<Polygon>")
-  n.geom <- sum(grepl(geom.kml, feat.kml))  # how many of desired type
+  feature_kml <- suppressWarnings(readLines(kml.file))
 
-  if ((n.geom)==0){
-    if (tryAlternate){
-      n.poly <- sum(grepl("<Polygon>", feat.kml))
-      n.line <- sum(grepl("<Line>", feat.kml))
-      n.point <- sum(grepl("<Point>", feat.kml))
-    G <- c(n.poly, n.line, n.point)
-    if (all(G==0)){return(NULL)}
-    geom <- c('polygon', 'line', 'point')[(which(G != 0))[1]]
+  kml_geom <- switch(geom,
+                     "point" = "<Point>",
+                     "line" = "<LineString>",
+                     "polygon" = "<Polygon>")
+
+  n_geom <- sum(grepl(kml_geom, feature_kml))  # how many of desired type
+
+  if ( (n_geom) == 0){
+    if (try_alternate){
+      n_poly <- sum(grepl("<Polygon>", feature_kml))
+      n_line <- sum(grepl("<Line>", feature_kml))
+      n_point <- sum(grepl("<Point>", feature_kml))
+    G <- c(n_poly, n_line, n_point)
+
+    if (all(G == 0)){ return(NULL) }
+
+    geom <- c("polygon", "line", "point")[(which(G != 0))[1]]
     }else{
     return(NULL)
+      }
   }
-  }
-  OGR.geom <- switch(geom,
-                     'point' ='MultiPoint',
-                     'line'="MultiLineString",
-                     'polygon'="MultiPolygon")
-  out.file <- gsub("\\.kml$", paste("_", tolower(geom), "\\.shp", sep=''),
+
+  OGR_geom <- switch(geom,
+                     "point" = "MultiPoint",
+                     "line" = "MultiLineString",
+                     "polygon" = "MultiPolygon")
+  out_file <- gsub("\\.kml$", paste("_", tolower(geom), "\\.shp", sep = ""),
                    kml.file)
 
   # convert to desired type
-  gdalUtils::ogr2ogr(src=kml.file,
-          dst=out.file, f='ESRI Shapefile',
-          where=sprintf("OGR_GEOMETRY = '%s'", OGR.geom),
-          mapFieldType = 'DateTime=String')
+  gdalUtils::ogr2ogr(src = kml.file,
+          dst = out_file, f = "ESRI Shapefile",
+          where = sprintf("OGR_GEOMETRY = '%s'", OGR_geom),
+          mapFieldType = "DateTime=String")
 
-  return(out.file)
+  return(out_file)
 }
-
-

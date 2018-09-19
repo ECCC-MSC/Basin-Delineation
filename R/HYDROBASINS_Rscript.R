@@ -18,30 +18,34 @@
 #' @return A list containing a spatial object and an attribute table
 #'
 #' @examples
-#'  LoadHybas("C:\\Data\\HydroBASINS", 'ar', 3)
+#'  LoadHybas("~/HydroBASINS", 'ar', 3)
 #'
 #' @export
 #===============================================================================
-LoadHybas <- function(path, area='na', level=7){
-  if(!file.exists(path)){
-  print("File does not exist")
+LoadHybas <- function(path, area = "na", level = 7){
+  if (!file.exists(path)){
+  print("Directory does not exist")
     return()
-    }
+  }
+
   if (file.info(path)$isdir == TRUE){
+
   ## If directory provided, search directory and find desired file (takes first if duplicates)
-  match.name <- paste("hybas_", area, sprintf("_lev%02d", level), sep='')
-  match.name.reg <- paste(match.name, ".*shp$", sep='')
-  files <-  list.files(path, recursive=T, pattern=match.name.reg,
+  match_name <- paste("hybas_", area, sprintf("_lev%02d", level), sep = "")
+  match_name_reg <- paste(match_name, ".*shp$", sep = "")
+  files <-  list.files(path, recursive = T, pattern = match_name_reg,
                        ignore.case = T, full.names = T)
 
-  file.to.load <- files[1]
+  file_to_load <- files[1]
 
-  }else{ #otherwise load file directly
-    file.to.load <- path
+  }else{
+    # if not a directory, load file directly
+    file_to_load <- path
   }
+
   ## Read in Shapefile
-  print(paste("loading", file.to.load))
-  shpdata <- rgdal::readOGR(file.to.load, stringsAsFactors = FALSE)
+  print(paste("loading", file_to_load))
+  shpdata <- rgdal::readOGR(file_to_load, stringsAsFactors = FALSE)
 
   return(shpdata)
 }
@@ -60,7 +64,7 @@ LoadHybas <- function(path, area='na', level=7){
 #'
 #' @param HYBAS a HYBAS spatial polygon object or dataframe from such an object
 #'
-#' @param max.pass integer, how many iterations to perform. To remove limit,
+#' @param n_iter integer, how many iterations to perform. To remove limit,
 #' set to -1 (default)
 #'
 #' @param ignore.endo logical, whether or not to include 'virtual' connections
@@ -69,12 +73,13 @@ LoadHybas <- function(path, area='na', level=7){
 #' @return a character vector of HydroBASIN ID's corresponding to downstream
 #' basins
 #===============================================================================
-FindDownstreamBasins <- function(HYBAS.ID, HYBAS, max.pass=-1, ignore.endo=T){
+FindDownstreamBasins <- function(HYBAS, HYBAS.ID, n_iter = -1, ignore.endo = T){
   HYBAS.NEW <- HYBAS.ID
-  i=0
-  while(length(HYBAS.NEW) > 0 & (max.pass==-1 | i < max.pass)){
+  i <- 0
+  while (length(HYBAS.NEW) > 0 & (n_iter == -1 | i < n_iter)){
+
     if (ignore.endo){
-      HYBAS.DOWN <- HYBAS@data[HYBAS$HYBAS_ID %in% HYBAS.NEW & HYBAS$ENDO !=2,
+      HYBAS.DOWN <- HYBAS@data[HYBAS$HYBAS_ID %in% HYBAS.NEW & HYBAS$ENDO != 2,
                                "NEXT_DOWN"]
     }else{
       HYBAS.DOWN <- HYBAS@data[HYBAS$HYBAS_ID %in% HYBAS.NEW, "NEXT_DOWN"]
@@ -83,10 +88,11 @@ FindDownstreamBasins <- function(HYBAS.ID, HYBAS, max.pass=-1, ignore.endo=T){
     HYBAS.DOWN <- HYBAS@data[HYBAS$HYBAS_ID %in% HYBAS.DOWN, "HYBAS_ID"]
     HYBAS.NEW <- HYBAS.DOWN[!(HYBAS.DOWN %in% HYBAS.ID)]
     HYBAS.ID <- c(HYBAS.ID, HYBAS.NEW)
-    i <- i+1
+
+    i <- i + 1
   }
 
-  return(HYBAS.ID)
+  return(HYBAS.ID[-1])
 }
 
 
@@ -111,14 +117,14 @@ FindDownstreamBasins <- function(HYBAS.ID, HYBAS, max.pass=-1, ignore.endo=T){
 #'
 #' @export
 #===============================================================================
-FindUpstreamSubBasins <- function(HYBAS, HYBAS.ID, ignore.endorheic=F){
-  if (!class(HYBAS)=='data.frame'){
+FindUpstreamSubBasins <- function(HYBAS, HYBAS.ID, ignore.endorheic = F){
+  if (!class(HYBAS) == "data.frame"){
     HYBAS <- HYBAS@data
   }
 
-  upstream.ab <- HYBAS[HYBAS$NEXT_DOWN == HYBAS.ID,c("HYBAS_ID", "ENDO")] # returns as char
+  upstream.ab <- HYBAS[HYBAS$NEXT_DOWN == HYBAS.ID, c("HYBAS_ID", "ENDO")] # returns as char
   if (ignore.endorheic){
-    upstream.ab <- upstream.ab[upstream.ab$ENDO != 2,]
+    upstream.ab <- upstream.ab[upstream.ab$ENDO != 2, ]
   }
   return(as.character(upstream.ab$HYBAS_ID))
 }
@@ -140,10 +146,10 @@ FindUpstreamSubBasins <- function(HYBAS, HYBAS.ID, ignore.endorheic=F){
 #'
 #' @export
 #===============================================================================
-FindAllUpstreamSubBasins <- function(HYBAS, HYBAS.ID, ignore.endorheic=F,
-                                     split=F){
+FindAllUpstreamSubBasins <- function(HYBAS, HYBAS.ID, ignore.endorheic = F,
+                                     split = F){
   # Simplify HYBAS to a dataframe
-  if (!class(HYBAS)=='data.frame'){
+  if (!class(HYBAS) == "data.frame"){
     HYBAS <- HYBAS@data
   }
 
@@ -162,9 +168,9 @@ FindAllUpstreamSubBasins <- function(HYBAS, HYBAS.ID, ignore.endorheic=F,
     sub.basins <- i # this is the object that gets passed to FindUpstreamSubBasins in each iteration
     while (run){
       result.i <- unlist(lapply(sub.basins, FindUpstreamSubBasins,
-                                HYBAS=HYBAS, ignore.endorheic=ignore.endorheic))
+                                HYBAS = HYBAS, ignore.endorheic = ignore.endorheic))
 
-      if (length(result.i)==0){ run <- F } # Stopping criterion
+      if (length(result.i) == 0){ run <- F } # Stopping criterion
       HYBAS.ID.list <- c(HYBAS.ID.list, result.i)
       sub.basins <- result.i
     }
@@ -198,14 +204,16 @@ FindAllUpstreamSubBasins <- function(HYBAS, HYBAS.ID, ignore.endorheic=F,
 #'
 #' @export
 #===============================================================================
-UpstreamHYBAS <- function(station, HYBAS, ignore.endorheic=F, fast=T, outputfile){
+UpstreamHYBAS <- function(station, HYBAS, ignore.endorheic = F, fast = T,
+                          outputfile){
 
-  if (!station@proj4string@projargs == HYBAS@proj4string@projargs){  # Ensure both are in HYBAS CRS (likely WGS84)
-    station <- sp::spTransform(station, CRSobj = CRS(HYBAS@proj4string@projargs))
+  if (!station@proj4string@projargs == HYBAS@proj4string@projargs){
+    # Ensure both are in HYBAS CRS (WGS84)
+    station <- sp::spTransform(station, CRSobj = sp::CRS(HYBAS@proj4string@projargs))
   }
 
-  if (fast){ # subset basins first
-    HYBAS <- HYBAS[substr(HYBAS$PFAF_ID,1,3) %in%
+  if (fast){ # subset basins first to improve speed
+    HYBAS <- HYBAS[substr(HYBAS$PFAF_ID, 1, 3) %in%
                      NearestHYBAS(station@data$station_number), ]
   }
 
@@ -219,24 +227,24 @@ UpstreamHYBAS <- function(station, HYBAS, ignore.endorheic=F, fast=T, outputfile
 
   ## For a given HYBAS ID, get all the upstream basins and their areas
   upstreamIDs <- FindAllUpstreamSubBasins(HYBAS, HYBAS.ID,
-                                          ignore.endorheic=ignore.endorheic,
+                                          ignore.endorheic = ignore.endorheic,
                                           split = T)
 
-  out <- HYBAS[match(c(HYBAS.ID ,unlist(upstreamIDs)), HYBAS@data$HYBAS_ID,
-                     nomatch=0),]
+  out <- HYBAS[match(c(HYBAS.ID, unlist(upstreamIDs)), HYBAS@data$HYBAS_ID,
+                     nomatch = 0), ]
 
   id <- list()
-  if (length(upstreamIDs)!=0){
-    names(upstreamIDs) <- LETTERS[2:(length(upstreamIDs)+1)]
+  if (length(upstreamIDs) != 0){
+    names(upstreamIDs) <- LETTERS[2:(length(upstreamIDs) + 1)]
     id <- lapply(names(upstreamIDs),
                function(x) upstreamIDs[[x]] <- rep(x, length(upstreamIDs[[x]])))
   }
-  out@data$ID <- c("A",unlist(id))
+  out@data$ID <- c("A", unlist(id))
   if (!missing(outputfile)){
-    rgdal::writeOGR(out, dsn=outputfile, layer=basename(outputfile),
-                    driver='ESRI Shapefile')
+    rgdal::writeOGR(out, dsn = outputfile, layer = basename(outputfile),
+                    driver = "ESRI Shapefile")
   }
- # out <- rgeos::gUnaryUnion(out, id=c("A",unlist(id)))
+
   return(out)
 }
 
@@ -264,27 +272,27 @@ FindNearestRiverSegment <- function(spatialPoint, riverLines, HYBAS){
 
   # reproject rivers and point into UTM if necessary
   if (spatialPoint@proj4string@projargs != riverLines@proj4string@projargs){
-    utm.zone <-  WhichZone(spatialPoint@data$longitude)
     CRS.string <- paste("+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96
                         +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m
-                        +no_defs", sep='')#+proj=utm +zone=",utm.zone," +ellps=WGS84 +datum=WGS84 +units=m +no_defs
-    spatialPoint <- sp::spTransform(spatialPoint, CRSobj = CRS(CRS.string))
-    HYBAS <- sp::spTransform(HYBAS, CRSobj = CRS(CRS.string))
+                        +no_defs", sep = "")
+    spatialPoint <- sp::spTransform(spatialPoint, CRSobj = sp::CRS(CRS.string))
+    HYBAS <- sp::spTransform(HYBAS, CRSobj = sp::CRS(CRS.string))
   }
 
 
   # find nearest river segment (?)
-  result <- data.frame(matrix(numeric(0), ncol=2))
-  distance <- numeric()
+  result <- data.frame(matrix(numeric(0), ncol = 2))
+  distances <- numeric()
   names(result) <- names(riverLines@data)
+
   for (i in seq(1:nrow(spatialPoint@data))){
-    delta <- rgeos::gDistance(spatialPoint[i,], riverLines, byid=TRUE)
+    delta <- rgeos::gDistance(spatialPoint[i, ], riverLines, byid = TRUE)
     smallest <- which.min(delta)
-    x <- riverLines[smallest,]
-    result <- rbind(result,x@data)
+    x <- riverLines[smallest, ]
+    result <- rbind(result, x@data)
     distances <- c(distances, delta[smallest])
     snappedcoords <- t(as.matrix(maptools::nearestPointOnLine(
-      x@lines[[1]]@Lines[[1]]@coords, spatialPoint[i,]@coords)))
+      x@lines[[1]]@Lines[[1]]@coords, spatialPoint[i, ]@coords)))
   }
 
   #return coordinate of point
@@ -300,7 +308,7 @@ ReadStationInformation <- function(station, con){
   # Figure out what "station" is and read it in
   if (class(station) == "SpatialPointsDataFrame"){
     print("detected a spatial object for: 'station'")
-  }else if (!missing(con) & class(station)=="character"){
+  }else if (!missing(con) & class(station) == "character"){
     print("reading 'station' from database connection")
     station <- SpatialHydat(con, station)
   }else if (file.exists(station)){
@@ -310,7 +318,7 @@ ReadStationInformation <- function(station, con){
     print("could not read 'station' information")
   }
   print(station$station_number)
-  if (nrow(station) == 0){stop('"station" object contains no points.')}
+  if (nrow(station) == 0){stop("'station' object contains no points.")}
   return(station)
 }
 
@@ -318,217 +326,23 @@ ReadStationInformation <- function(station, con){
 #' @title Calculate non-contributing area for
 #'
 #===============================================================================
-CalculateNCA <- function(NCA, basin, projected.CRS){
+CalculateNCA <- function(NCA, basin, projected.CRS, verbose=T){
+  if (verbose){cat("calculating non-contributing area ... ")}
   NCA <- InterpretShapefile(NCA)
   if (NCA@proj4string@projargs != projected.CRS){
     NCA <- sp::spTransform(NCA, sp::CRS(projected.CRS))
   }
+  basin <- InterpretShapefile(basin)
+  if (basin@proj4string@projargs != projected.CRS){
+    basin <- sp::spTransform(basin, sp::CRS(projected.CRS))
+  }
   clipped <- rgeos::gDifference(basin, NCA)
-  drainage.effective <- round(raster::area(clipped)) * 1e-6
-  print("take out non-contributing area") # take out non-contributing area
-  return(drainage.effective)
+  drainage_effective <- round(raster::area(clipped)) * 1e-6
+
+  if (verbose){cat(sprintf(" %.1f km2 \n", drainage_effective))}
+  return(drainage_effective)
 }
 
-#===============================================================================
-#' Create basin delineation from DEM and HydroBASINS
-#'
-#' @description Gives information about a station (upstream area, upstream
-#' stations)
-#'
-#' @param station Either a SpatialPointsDataFrame or the path to a
-#' Hydat-exported table with desired points or a character vector of station
-#'  names (in this case a connection must be specified)
-#'
-#' @param con (optional) A open database connection.  Used if station is a
-#' character vector of station names
-#'
-#' @param DEM.source either
-#'
-#' @param DEM.index index shapefile (optional)
-#'
-#' @param outdir (optional) A directory to which the output shapefile and report
-#'  will be saved.  If not specified,
-#' the function will return an R object without saving data to disk.
-#'
-#' @param pourpoints spatial points data frame with
-#'
-#' @param NCA (optional) Either a character string path or a
-#' SpatialPolygonsDataFrame.  This is a polygon of the non-contributing areas.
-#'  If provided, calculates effective drainage area
-#'
-#' @return A list of SpatialPolygonDataFrames
-#'
-#' @export
-#===============================================================================
-DelineateBasin <- function(station, con, outdir, HYBAS, DEM.path,DEM.index,
-                           DEM.source, saga.env, NCA, interactive=F,pourpoints,
-                           default.to.HYB=F,
-                           projected.CRS="+proj=aea +lat_1=50 +lat_2=70 +lat_0=40
-                           +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83
-                           +units=m +no_defs", ...){
-
-  station <- ReadStationInformation(station, con=con)
-
-  if (!missing(pourpoints)){
-    station <- getPourPoint(station, pourpoints)
-  }
-  #=============
-  # Calculations
-  #=============
-
-  # Get upslope area from HYBAS
-  HYB.Poly.individual <- UpstreamHYBAS(station, HYBAS)
-  HYB.Poly <- rgeos::gUnaryUnion(HYB.Poly.individual, id=HYB.Poly.individual$ID) # combined area
-  no.upstream.hyb <- (length(HYB.Poly.individual) == 1)
-
-  # Get first two upstream tiles (should be the first one for each ID)
-  first.up <- unlist(by(
-    data = HYB.Poly.individual@data,
-    INDICES = HYB.Poly.individual@data$ID,
-    FUN = function(x)
-            as.character(x[which.max(as.character(x$UP_AREA)),c("HYBAS_ID")])))
-
-  first.up.HYB <- HYB.Poly.individual[HYB.Poly.individual$HYBAS_ID %in%
-                                      first.up & HYB.Poly.individual$ENDO != 2,]
-
-  first.up.HYB.endo <- HYB.Poly.individual[HYB.Poly.individual$HYBAS_ID %in%
-                                             first.up,]
-
-  # find any endorheic basins
-  endo.HYB <- HYB.Poly.individual@data[HYB.Poly.individual$HYBAS_ID %in%
-                                 first.up & HYB.Poly.individual$ENDO == 2,"ID"]
-
-  ID.list <- sapply(slot(HYB.Poly, "polygons"), function(x) slot(x, "ID"))
-  endo <- ID.list %in% endo.HYB
-
-  disjoint <- rep(F, length(endo))
-  not.unlikely <- rep(F, length(endo))
-
-  # find necessary coverage for DEM TODO[NB]: Clean part this up: its a mess!
-  if (!missing(DEM.index)){
-    DEM.path <- OverlayDEM(rgeos::gUnaryUnion(first.up.HYB),
-                           tileindex=DEM.index, saga.env$workspace,
-                           saga.env$workspace, product = DEM.source,
-                           tilename="NTS_SNRC")
-  }else{
-    DEM.path <- OverlayDEM(geom1 = rgeos::gUnaryUnion(first.up.HYB),
-                           DEM.dir = saga.env$workspace,
-                           output.dir = saga.env$workspace,
-                           product = DEM.source, tol=15e3
-                           )
-  }
-
-  # Get upslope area from DEM
-  DEMresult <- UpslopeDEM(station, DEM.path = DEM.path, DEM.source=DEM.source,
-                          saga.env = saga.env,
-                         outdir = saga.env$workspace,
-                         projected.CRS=projected.CRS, ...)
-
-  if (DEMresult$nodata==T){ # if the point has no data
-    DEM.poly.p <- sp::spTransform(HYB.Poly, CRS = sp::CRS(projected.CRS)) #use different CRS?
-  }
-  DEM.Poly <- DEMresult$final.name
-  pointbuffer <- DEMresult$pointbuffer
-  iterate.to <- DEMresult$iterate.to
-  iterate.thres <- DEMresult$iterate.thres
-
-  DEM.Poly.p <- invisible(rgdal::readOGR(DEM.Poly))
-  DEM.Poly.p <- DEM.Poly.p[which.max(raster::area(DEM.Poly.p)),] # take the big one.  others will likely have bad geometries
-
-  # Clip 'nose' of basin
-  HP.p <- sp::spTransform(HYB.Poly,
-                          CRSobj = sp::CRS(DEM.Poly.p@proj4string@projargs))
-
-  local.drainage.p <- rgeos::gIntersection(HP.p[1,],
-                                           DEM.Poly.p,
-                                           byid = F,
-                                           drop_lower_td = TRUE) # DEM area within containing hybas
-
-
-  #=====================
-  #  Logical Steps
-  #=====================
-
-  if (!no.upstream.hyb){
-    # if DEM is disjoint with upslope area, do not include it.
-    disjoint <- rgeos::gDisjoint(HP.p, local.drainage.p, byid = T)
-
-    # if calculated total upslope area is less than half of an upslope HYBAS region, remove that HYBAS region
-    not.unlikely <- raster::area(DEM.Poly.p) >
-      0.5*raster::area(sp::spTransform(first.up.HYB.endo,
-                                       CRS(DEM.Poly.p@proj4string@projargs)))
-  }
-
-  keep <- ID.list[(!disjoint | endo) & (not.unlikely | endo)]
-  HP.out <- HP.p[keep[-which(keep=="A")],] # maybe can delete this?
-
-  # merge desired parts of HYBAS polygons with local drainage
-  if (pointbuffer >= iterate.to & default.to.HYB){      # in this case, just use the HYBAS
-    output <- rgeos::gUnaryUnion(HP.p)
-  }else if ((length(HP.out) > 0 & !no.upstream.hyb)|
-            (pointbuffer >= iterate.to & !default.to.HYB)){
-    # HP.p.merged <- rgeos::gUnaryUnion(HP.out)
-    # output <- rgeos::gUnion(local.drainage.p, HP.out)
-    ContainingHydrobasins <- HP.p[keep] #include containing ("A") hydrobasin
-    DEMwithinHB <- rgeos::gIntersection(DEM.Poly.p, ContainingHydrobasins)
-    output <- rgeos::gUnion(HP.out, DEMwithinHB)
-  }else{
-    output <- rgeos::gUnaryUnion(local.drainage.p)
-  }
-
-  dr_ar <- raster::area(output) *1e-6
-
-  # clean geometry with a zero-width buffer and remove holes / small rings
-  output <- rgeos::gBuffer(output, byid=TRUE, width=0)
-  output <- outerRing(output)
-
-  # Calculate non-contributing areas
-  if (!missing(NCA)){
-
-  }else{
-    drainage.effective <- NA
-  }
-
-  # create attribute table
-  station@data <- AddMissingColumns(station@data,
-                                    c("drainage_area_gross", "drainage_area_effect"))
-
-  data <- as.data.frame(list(  # make output table
-    stn_number=station@data$station_number,
-    drainar_gr=dr_ar,
-    drainar_ef=drainage.effective,  # add notes?
-    stn_dr_gr=station@data$drainage_area_gross,
-    stn_dr_ef=station@data$drainage_area_effect,
-    trgtRdius=pointbuffer,
-    trgtRdMax=iterate.to,
-    iterThres=iterate.thres,
-    snapped=DEMresult$snapped,
-    snapDist=DEMresult$snap.dist,
-    DEM_source=DEM.source
-  ))
-
-   output <-  sp::spTransform(SpatialPolygonsDataFrame(output, data), # output shape file with same CRS as station
-                              CRSobj = sp::CRS(station@proj4string@projargs))
-
-  # write output shapefile (rgdal::writeOGR)
-  name <- paste(station$station_number, "_basin.shp")
-  rgdal::writeOGR(output, dsn=file.path(outdir, name), layer=name,
-                  driver="ESRI Shapefile")
-
-  # write output table (optional?)
-  tablename <- paste(station$station_number, "_basin.csv")
-  write.csv(output@data, file.path(outdir, tablename), row.names=F)
-
-  #clean up (optional?)
- # file.remove(DEM.Poly)
-
-  return(list(
-    includedHYB=HP.out,
-    dem.local=local.drainage.p,
-    out=output,
-    orig.DEM=DEM.Poly.p,
-    allHYB=HP.p))
-}
 
 #===============================================================================
 #' @title Move station to pourpoint
@@ -551,11 +365,10 @@ getPourPoint <- function(point, pourpoint){
     pp <- pourpoint[pourpoint@data$station_number ==
                       point@data$station_number, "station_number"]
     pp@data <- merge(pp@data, point@data)
-    print('Using pour point coordinate')
+    print("Using pour point coordinate")
     return(pp)
   }else{
-    print('No matching pour point found!')
+    print("No matching pour point found!")
     return(point)
   }
 }
-

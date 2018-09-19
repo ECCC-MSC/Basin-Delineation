@@ -11,13 +11,13 @@
 #'
 #' @param station spatialpointsdataframe representing a hydrological station
 #'
-#' @param in.DEM character path pointing to hydrologically conditioned DEM.
+#' @param in_DEM character path pointing to hydrologically conditioned DEM.
 #' Must be in projected
 #' coordinate system and, at a minimum, have filled sinks.
 #'
-#' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
+#' @param saga_env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #'
-#' @param upstream.threshold integer, number of upstream cells required to
+#' @param upstr_threshold integer, number of upstream cells required to
 #' initiate channel growth. A smaller number will yield more channels and will
 #'  snap to smaller streams. Larger numbers will produce only major channel
 #'   branches. For a 50k DEM, numbers between 20,000 and 50,000 are appropriate
@@ -28,14 +28,14 @@
 #'
 #' @export
 #===============================================================================
-SnapToPourPoint <- function(station, in.DEM, saga.env, upstream.threshold=35000){
-  chann <- ChannelNetworkRS(in.DEM=in.DEM, upstream.threshold=upstream.threshold,
-                            saga.env=envi, verbose=F)
+SnapToPourPoint <- function(station, in_DEM, saga_env, upstr_threshold = 35000){
+  chann <- ChannelNetworkRS(in_DEM = in_DEM, upstr_threshold = upstr_threshold,
+                            saga_env = envi, verbose = F)
   chann <- rgdal::readOGR(chann)
   newpoint <- SnapToNearest(station, chann)
   dist <- rgeos::gDistance(station, chann)
 
-  return(list(station=newpoint, distance=dist))
+  return(list(station = newpoint, distance = dist))
 }
 
 #===============================================================================
@@ -50,58 +50,58 @@ SnapToPourPoint <- function(station, in.DEM, saga.env, upstream.threshold=35000)
 #' @param grid.sys A SAGA *.sgrd file with the same grid system as the desired
 #' output
 #'
-#' @param out.name Character string of output file name
+#' @param out_name Character string of output file name
 #'
 #' @param env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #'
-#' @param buffer.dist If equal to zero does not buffer.
+#' @param buffer_dist If equal to zero does not buffer.
 #'
 #' @keywords internal
 #'
 #' @export
 #===============================================================================
-Point2GridRS <- function(point, grid.sys, out.name,  saga.env, buffer.dist=150,
-                         verbose=F){
+Point2GridRS <- function(point, grid.sys, out_name,  saga_env, buffer_dist = 150,
+                         verbose = F){
   print("Converting point to grid ...")
   # Write point as shapefile
-  rgdal::writeOGR(point, dsn=file.path(saga.env$workspace, "target.shp"),
-                  layer="target.shp", driver="ESRI Shapefile")
+  rgdal::writeOGR(point, dsn = file.path(saga_env$workspace, "target.shp"),
+                  layer = "target.shp", driver = "ESRI Shapefile")
   # Convert shapefile to grid
-  RSAGA::rsaga.geoprocessor(lib = 'grid_gridding', module=0, env=saga.env,
+  RSAGA::rsaga.geoprocessor(lib = "grid_gridding", module = 0, env = saga_env,
                             show.output.on.console = verbose,
                             check.module.exists = FALSE, param = list(
-    INPUT=file.path(saga.env$workspace, "target.shp"),
-    OUTPUT=0,
-    GRID_TYPE=0,
-    TARGET_DEFINITION=1,  # Better to define by the other grid (less prone to error? but maybe slower??)
-    TARGET_TEMPLATE=grid.sys,
-    GRID=out.name
+    INPUT             = file.path(saga_env$workspace, "target.shp"),
+    OUTPUT            = 0,
+    GRID_TYPE         = 0,
+    TARGET_DEFINITION = 1,  # Better to define by the other grid (less prone to error? but maybe slower??)
+    TARGET_TEMPLATE   = grid.sys,
+    GRID              = out_name
   ))
 
-  if (buffer.dist > 0){
+  if (buffer_dist > 0){
     # Grid buffer module 8
-    RSAGA::rsaga.geoprocessor(lib = 'grid_tools', module=8, env=saga.env,
+    RSAGA::rsaga.geoprocessor(lib = "grid_tools", module = 8, env = saga_env,
                               show.output.on.console = verbose,
                               check.module.exists = FALSE, param = list(
-      FEATURES=out.name,
-      BUFFER=out.name,
-      DIST=buffer.dist,
-      BUFFERTYPE=0
+      FEATURES   = out_name,
+      BUFFER     = out_name,
+      DIST       = buffer_dist,
+      BUFFERTYPE = 0
     ))
   }
 }
 
 #===============================================================================
-#' @title Clip grid to buffered point (Clip Grids = 31)
+#' @title Clip grid to object plus buffer (Clip Grids = 31)
 #'
-#' @param point SpatialPointsDataFrame
+#' @param point Spatial* object
 #'
-#' @param in.DEM character path to tiled grid to clip
+#' @param in_DEM character path to tiled grid to clip
 #'
-#' @param out.DEM (optional) path to save output DEM, otherwise appends
-#' '_clipped' to filename of in.DEM
+#' @param out_DEM (optional) path to save output DEM, otherwise appends
+#' '_clipped' to filename of in_DEM
 #'
-#' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
+#' @param saga_env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #'
 #' @param tol size of clipping box (metres) around point
 #'
@@ -109,21 +109,25 @@ Point2GridRS <- function(point, grid.sys, out.name,  saga.env, buffer.dist=150,
 #'
 #' @export
 #===============================================================================
-ClipGridRS <- function(point, in.DEM, out.DEM, saga.env, tol, verbose=F){
-  print("Clipping grid based on point location...")
-  if (missing(out.DEM)) out.DEM <- gsub("\\.sgrd", "_clipped\\.sgrd", in.DEM)
-  x = point@coords[,1]
-  y = point@coords[,2]
+ClipGridRS <- function(point, in_DEM, out_DEM, saga_env, tol, verbose=F){
+  print("Clipping grid to vector ...")
 
-  RSAGA::rsaga.geoprocessor(lib = 'grid_tools', module=31, env=saga.env,
+  if (missing(out_DEM)) out_DEM <- gsub("\\.sgrd", "_clipped\\.sgrd", in_DEM)
+
+  xmin <- point@bbox[1, 1]
+  xmax <- point@bbox[1, 2]
+  ymin <- point@bbox[2, 1]
+  ymax <- point@bbox[2, 2]
+
+  RSAGA::rsaga.geoprocessor(lib = "grid_tools", module = 31, env = saga_env,
                             show.output.on.console = verbose,
                             check.module.exists = FALSE, param = list(
-    GRIDS=in.DEM,
-    CLIPPED=out.DEM,
-    XMIN=x - tol,
-    XMAX=x + tol,
-    YMIN=y - tol,
-    YMAX=y + tol
+    GRIDS   = in_DEM,
+    CLIPPED = out_DEM,
+    XMIN    = xmin - tol,
+    XMAX    = xmax + tol,
+    YMIN    = ymin - tol,
+    YMAX    = ymax + tol
   ))
 }
 
@@ -135,25 +139,25 @@ ClipGridRS <- function(point, in.DEM, out.DEM, saga.env, tol, verbose=F){
 #' @param clipping.layer character path to tiled grid to clip
 #'
 #' @param output (optional) path to save output DEM, otherwise appends '_clipped'
-#' to filename of in.DEM
+#' to filename of in_DEM
 #'
-#' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
+#' @param saga_env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #'
 #' @keywords internal
 #'
 #' @export
 #===============================================================================
-ClipPolygonRS <- function(input, clipping.layer, output, saga.env,verbose=F){
+ClipPolygonRS <- function(input, clipping.layer, output, saga_env, verbose=F){
   print("Clipping Polygons...")
   if (missing(output)) output <- gsub("\\.sgrd", "_clipped\\.sgrd", input)
 
-  RSAGA::rsaga.geoprocessor(lib = 'shapes_polygons', module=11, env=saga.env,
+  RSAGA::rsaga.geoprocessor(lib = "shapes_polygons", module = 11, env = saga_env,
                             show.output.on.console = verbose,
                             check.module.exists = FALSE, param = list(
-                              CLIP=clipping.layer,
-                              S_INPUT=input,
-                              S_OUTPUT=output,
-                              DISSOLVE=1
+                              CLIP     = clipping.layer,
+                              S_INPUT  = input,
+                              S_OUTPUT = output,
+                              DISSOLVE = 1
                               ))
 }
 
@@ -164,12 +168,12 @@ ClipPolygonRS <- function(input, clipping.layer, output, saga.env,verbose=F){
 #' @description Fill sinks according to Wang and Liu ('ta_preprocessor' module
 #' 4 or 5 for XXL)
 #'
-#' @param in.DEM character path to grid to fill
+#' @param in_DEM character path to grid to fill
 #'
-#' @param out.DEM (optional) path to save output DEM, otherwise appends
-#' '_filled' to filename of in.DEM
+#' @param out_DEM (optional) path to save output DEM, otherwise appends
+#' '_filled' to filename of in_DEM
 #'
-#' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
+#' @param saga_env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #'
 #' @param MINSLOPE minimum slope to maintain between cells
 #'
@@ -178,61 +182,67 @@ ClipPolygonRS <- function(input, clipping.layer, output, saga.env,verbose=F){
 #'
 #' @export
 #===============================================================================
-FillSinksRS <- function(in.DEM, out.DEM, saga.env, MINSLOPE=0.01, verbose=F,
+FillSinksRS <- function(in_DEM, out_DEM, saga_env, MINSLOPE=0.01, verbose=F,
                         XXL=F){
   print("Filling sinks...")
-  if (missing(out.DEM)) out.DEM <- gsub("\\.s[gd][ra][dt]", "_filled\\.sgrd",
-                                        in.DEM)
+  if (missing(out_DEM)) out_DEM <- gsub("\\.s[gd][ra][dt]", "_filled\\.sgrd",
+                                        in_DEM)
 
   # Fill sinks (wang & Liu) = 4
   module <- ifelse(XXL, 5, 4)
-  RSAGA::rsaga.geoprocessor(lib = 'ta_preprocessor', module=module, env=saga.env,
-                    show.output.on.console = verbose,
-                    check.module.exists = FALSE, param=list(
-                      ELEV=in.DEM,
-                      FILLED=out.DEM,
-                      MINSLOPE=MINSLOPE  # not sure how to choose optimal value
+  RSAGA::rsaga.geoprocessor(lib = "ta_preprocessor", module = module,
+                            env = saga_env, show.output.on.console = verbose,
+                    check.module.exists = FALSE, param = list(
+                      ELEV     = in_DEM,
+                      FILLED   = out_DEM,
+                      MINSLOPE = MINSLOPE  # unsure how to choose optimal value
                             ))
-  return(out.DEM)
+
+  return(out_DEM)
 }
 
 #===============================================================================
 #' @title Sink Removal
 #'
-#' @description Remove sinks by filling sinks or deepening drainage routes using the method of Conrad (2001)
+#' @description Remove sinks by filling sinks or deepening drainage routes using
+#' the method of Conrad (2001)
 #'
-#' @param in.DEM character path to grid to fill
+#' @param in_DEM character path to grid to fill
 #'
-#' @param out.DEM (optional) path to save output DEM, otherwise appends '_filled' to filename of in.DEM
+#' @param out_DEM (optional) path to save output DEM, otherwise appends '_filled'
+#' to filename of in_DEM
 #'
-#' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
+#' @param saga_env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #'
 #' @param METHOD Available Choices: [0] Deepen Drainage Routes [1] Fill Sinks.
 #'
 #' @param THRESHOLD logical, whether or not to exclude deeper sinks from filling
 #'
-#' @param THRESHOLD.HEIGHT numeric, The parameter describes the maximum depth of a sink to be considered for removal [map units].
-#'  This makes it possible to exclude deeper sinks from filling.
+#' @param THRESHOLD.HEIGHT numeric, The parameter describes the maximum depth of
+#' a sink to be considered for removal [map units]. This makes it possible to
+#' exclude deeper sinks from filling.
 #'
 #' @keywords internal
 #'
 #' @export
 #===============================================================================
-BreachDepressionsRS <- function(in.DEM, out.DEM, saga.env, METHOD=0, THRESHOLD=0, THRESHOLD.HEIGHT=100, verbose=F){
+BreachDepressionsRS <- function(in_DEM, out_DEM, saga_env, METHOD=0, THRESHOLD=0,
+                                THRESHOLD.HEIGHT=100, verbose=F){
   print(paste(ifelse(METHOD, "Filling", "Breaching"), "sinks..."))
 
-  if (missing(out.DEM)) out.DEM <- gsub("\\.sgrd", "_sinksremoved\\.sgrd", in.DEM)
+  if (missing(out_DEM)) out_DEM <- gsub("\\.sgrd", "_sinksremoved\\.sgrd", in_DEM)
 
 
-  RSAGA::rsaga.geoprocessor(lib = 'ta_preprocessor', module=2, env=saga.env, show.output.on.console = verbose,
-                            check.module.exists = FALSE, param=list(
-                              DEM=in.DEM,
-                              DEM_PREPROC=out.DEM,
-                              METHOD=METHOD,
-                              THRESHOLD=THRESHOLD,
-                              THRSHEIGHT=THRESHOLD.HEIGHT
+  RSAGA::rsaga.geoprocessor(lib = "ta_preprocessor", module = 2, env = saga_env,
+                            show.output.on.console = verbose,
+                            check.module.exists = FALSE, param = list(
+                              DEM         = in_DEM,
+                              DEM_PREPROC = out_DEM,
+                              METHOD      = METHOD,
+                              THRESHOLD   = THRESHOLD,
+                              THRSHEIGHT  = THRESHOLD.HEIGHT
                             ))
-  return(out.DEM)
+  return(out_DEM)
 }
 
 #===============================================================================
@@ -241,26 +251,26 @@ BreachDepressionsRS <- function(in.DEM, out.DEM, saga.env, METHOD=0, THRESHOLD=0
 #' @description Calculates upslope area and produces a grid ('ta_hydrology'
 #' module 4)
 #'
-#' @param in.DEM Hydrologically appropriate DEM file (saga grid)
+#' @param in_DEM Hydrologically appropriate DEM file (saga grid)
 #'
 #' @param target.grid saga grid
 #'
 #' @param out.GRD character string path to output grid
 #'
-#' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
+#' @param saga_env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #'
 #' @export
 #===============================================================================
-UpslopeAreaRS <- function(in.DEM, target.grid, out.GRD, saga.env, verbose=F,
+UpslopeAreaRS <- function(in_DEM, target.grid, out.GRD, saga_env, verbose=F,
                           method=1){
   print("Calculating upstream area...")
-  RSAGA::rsaga.geoprocessor(lib='ta_hydrology', module=4, env=saga.env,
+  RSAGA::rsaga.geoprocessor(lib = "ta_hydrology", module = 4, env = saga_env,
                             show.output.on.console = verbose,
-                            check.module.exists = FALSE, param=list(
-    TARGET=target.grid,
-    ELEVATION=in.DEM,
-    AREA=out.GRD,
-    METHOD=method
+                            check.module.exists = FALSE, param = list(
+    TARGET    = target.grid,
+    ELEVATION = in_DEM,
+    AREA      = out.GRD,
+    METHOD    = method
   ))
   return(out.GRD)
 }
@@ -270,24 +280,24 @@ UpslopeAreaRS <- function(in.DEM, target.grid, out.GRD, saga.env, verbose=F,
 #'
 #' @description Creates a polygon from a grid ('shapes_grid' module 6:
 #'  Vectorising Grid Classes)
-#' @param in.GRD character string path to SAGA grid file.  The grid should
-#' @param out.poly character string path to output polygon shapefile
-#' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
+#' @param in_grd character string path to SAGA grid file.  The grid should
+#' @param out_poly character string path to output polygon shapefile
+#' @param saga_env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #' @param CLASS_ID numeric raster value that designates which grid cells to
 #'  convert to polygon (cells with other values will be ignored)
 #' @export
 #===============================================================================
-Grid2PolyRS <- function(in.GRD, out.poly, saga.env, CLASS_ID=100, verbose=F){
+Grid2PolyRS <- function(in_grd, out_poly, saga_env, CLASS_ID=100, verbose=F){
   print("Converting grid to polygons...")
-  RSAGA::rsaga.geoprocessor(lib = 'shapes_grid', module=6, env=saga.env,
+  RSAGA::rsaga.geoprocessor(lib = "shapes_grid", module = 6, env = saga_env,
                             show.output.on.console = verbose,
                             check.module.exists = FALSE, param = list(
-    GRID=in.GRD,
-    POLYGONS=out.poly,
-    CLASS_ALL=0,
-    CLASS_ID=CLASS_ID,
-    SPLIT=1,
-    ALLVERTICES=0
+    GRID        = in_grd,
+    POLYGONS    = out_poly,
+    CLASS_ALL   = 0,
+    CLASS_ID    = CLASS_ID,
+    SPLIT       = 1,
+    ALLVERTICES = 0
   ))
 }
 
@@ -295,15 +305,15 @@ Grid2PolyRS <- function(in.GRD, out.poly, saga.env, CLASS_ID=100, verbose=F){
 #' @title Difference grids
 #' @description shapes_polygons' module 15
 #===============================================================================
-DifferenceRS <- function(shape, eraser, output, saga.env, verbose=F){
+DifferenceRS <- function(shape, eraser, output, saga_env, verbose=F){
   print("Differencing shapes...")
-  RSAGA::rsaga.geoprocessor(lib = 'shapes_polygons', module=15, env=saga.env,
+  RSAGA::rsaga.geoprocessor(lib = "shapes_polygons", module = 15, env = saga_env,
                             show.output.on.console = verbose,
                             check.module.exists = FALSE, param = list(
-    A=shape,
-    B=eraser,
-    RESULT=output,
-    SPLIT=0
+    A      = shape,
+    B      = eraser,
+    RESULT = output,
+    SPLIT  = 0
     ))
 }
 
@@ -311,17 +321,19 @@ DifferenceRS <- function(shape, eraser, output, saga.env, verbose=F){
 #' @title Calculate Grid Volume
 #' @description grid_calculus' module 2
 #===============================================================================
-GridVolumeRS <- function(grid, level, method=0, saga.env){
+GridVolumeRS <- function(grid, level, method=0, saga_env){
   print("Calculating Grid Volume...")
+
   volume <- invisible(capture.output(RSAGA::rsaga.geoprocessor(
-    lib = 'grid_calculus', module=2, env=saga.env,
+    lib = "grid_calculus", module = 2, env = saga_env,
                check.module.exists = FALSE, param = list(
-                              GRID=grid,
-                              METHOD=method,
-                              LEVEL=level
+                              GRID   = grid,
+                              METHOD = method,
+                              LEVEL  = level
                             ))))
+
   volume <- as.numeric(gsub("Volume: ", "",
-                            regmatches(volume,regexpr("^Volume: (\\d*\\.\\d*)",
+                            regmatches(volume, regexpr("^Volume: (\\d*\\.\\d*)",
                                                       volume))))
   return(volume)
 }
@@ -329,16 +341,18 @@ GridVolumeRS <- function(grid, level, method=0, saga.env){
 #===============================================================================
 #' @title Grid threshold
 #===============================================================================
-GridThresholdRS <- function(grid, threshold.value, method=0, saga.env, dstfile){
+GridThresholdRS <- function(grid, threshold_value, method=0, saga_env, dstfile){
   print("Thresholding Grid...")
-  if (missing(dstfile)) dstfile <- gsub("\\.(.{2,5})$","_thres\\.sdat", grid)
-  volume <- capture.output(RSAGA::rsaga.geoprocessor(lib = 'grid_calculus',
-                                                     module=1, env=saga.env,
+
+  if (missing(dstfile)) dstfile <- gsub("\\.(.{2,5})$", "_thres\\.sdat", grid)
+
+  volume <- capture.output(RSAGA::rsaga.geoprocessor(lib = "grid_calculus",
+                                                     module = 1, env = saga_env,
             check.module.exists = FALSE, param = list(
-                   GRIDS=grid,
-                    FORMULA=sprintf("(g1>%d)*100",threshold.value),
-                   TYPE=4,
-                     RESULT=dstfile
+                   GRIDS   = grid,
+                   FORMULA = sprintf("(g1>%d)*100", threshold_value),
+                   TYPE    = 4,
+                   RESULT  = dstfile
                     )))
 
   return(dstfile)
@@ -348,7 +362,7 @@ GridThresholdRS <- function(grid, threshold.value, method=0, saga.env, dstfile){
 #' @description Builds mosaicked DEM using SAGA 'grid_tools' module 3
 #' @param grids character vector of input grids
 #' @param out_grid file path to output grid
-#' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
+#' @param saga_env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #' @param xmin xmin
 #' @param xmax xmax
 #' @param ymin ymin
@@ -356,24 +370,25 @@ GridThresholdRS <- function(grid, threshold.value, method=0, saga.env, dstfile){
 #' @param cellsize cell size
 
 #===============================================================================
-MoisaicRS <- function(grids, out_grid, saga.env, xmin, xmax, ymin, ymax,
-                      cellsize, verbose=F){
+MoisaicRS <- function(grids, out_grid, saga_env, xmin, xmax, ymin, ymax,
+                      cellsize, verbose = F){
   print("Building Mosaic...")
-  RSAGA::rsaga.geoprocessor(lib = 'grid_tools', module=3, env=saga.env,
+
+  RSAGA::rsaga.geoprocessor(lib = "grid_tools", module = 3, env = saga_env,
                             show.output.on.console = verbose,
                             check.module.exists = FALSE, param = list(
-    GRIDS=grids,
-    TYPE=4,  # 2-byte signed integer
-    INTERPOL=4,
-    OVERLAP=0,
-    MATCH=0,
-    TARGET_DEFINITION=0,
-    TARGET_USER_XMIN=xmin,
-    TARGET_USER_XMAX=xmax,
-    TARGET_USER_YMIN=ymin,
-    TARGET_USER_YMAX=ymax,
-    TARGET_USER_SIZE=cellsize,
-    TARGET_OUT_GRID=out_grid
+    GRIDS             = grids,
+    TYPE              = 4,  # 2-byte signed integer
+    INTERPOL          = 4,
+    OVERLAP           = 0,
+    MATCH             = 0,
+    TARGET_DEFINITION = 0,
+    TARGET_USER_XMIN  = xmin,
+    TARGET_USER_XMAX  = xmax,
+    TARGET_USER_YMIN  = ymin,
+    TARGET_USER_YMAX  = ymax,
+    TARGET_USER_SIZE  = cellsize,
+    TARGET_OUT_GRID   = out_grid
     ))
 }
 
@@ -390,25 +405,25 @@ MoisaicRS <- function(grids, out_grid, saga.env, xmin, xmax, ymin, ymax,
 #' saves to same directory as input.  Note that the file name must have the
 #' "sdat" file extension (not sgrid)
 #'
-#' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
-#'
-#' @param outputCRS character string specifying the coordinate system of the
+#' @param output_crs character string specifying the coordinate system of the
 #' output grid.  Examples include: "+proj=aea +lat_1=50 +lat_2=70 +lat_0=40
 #' +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs"
 #'
 #' @keywords internal
 #' @export
 #===============================================================================
-gdal_warp2SAGA <- function(srcfile, dstfile, outputCRS, srcnodata=-32768,
-                           dstnodata=-32767, s_srs="EPSG:4326"){
+gdal_warp2SAGA <- function(srcfile, dstfile, output_crs, srcnodata = -32768,
+                           dstnodata = -32767, s_srs = "EPSG:4326"){
   print("warping raster...")
-  srcfile <- gsub('[\\/]$', '', srcfile)
-  if (missing(dstfile)) dstfile <- gsub("\\.(.{2,5})$","_warped\\.sdat",srcfile)
-  gdalUtils::gdalwarp(srcfile=srcfile,
-           dstfile=dstfile,
-           srcnodata=srcnodata, dstnodata=dstnodata,
-           s_srs = s_srs, t_srs=outputCRS, of = "SAGA", r='near', overwrite=T,
-           stderr=T)
+  srcfile <- gsub("[\\/]$", "", srcfile)
+
+  if (missing(dstfile)) dstfile <- gsub("\\.(.{2,5})$", "_warped\\.sdat", srcfile)
+
+  gdalUtils::gdalwarp(srcfile = srcfile,
+           dstfile = dstfile,
+           srcnodata = srcnodata, dstnodata = dstnodata,
+           s_srs = s_srs, t_srs = output_crs, of = "SAGA", r = "near",
+           overwrite = T,  stderr = T)
 
   return(dstfile)
 }
@@ -416,12 +431,13 @@ gdal_warp2SAGA <- function(srcfile, dstfile, outputCRS, srcnodata=-32768,
 #===============================================================================
 #' @title Mosaic rasters with GDAL
 #===============================================================================
-gdal_mosaic <- function(srcfiles, dstfile, srcnodata=-32768, dstnodata, of="SAGA"){
+gdal_mosaic <- function(srcfiles, dstfile, srcnodata = -32768, dstnodata, of = "SAGA"){
   print("building mosaic...")
-  gdalUtils::mosaic_rasters(gdalfile=srcfiles,
-                      dst_dataset=dstfile,
-                      srcnodata=srcnodata, dstnodata=dstnodata,
-                      of = "SAGA", r='near', overwrite=T, stderr=T)
+  gdalUtils::mosaic_rasters(gdalfile = srcfiles,
+                      dst_dataset = dstfile,
+                      srcnodata = srcnodata, dstnodata = dstnodata,
+                      of = "SAGA", r = "near", overwrite = T, stderr = T)
+
   return(dstfile)
 }
 
@@ -430,18 +446,18 @@ gdal_mosaic <- function(srcfiles, dstfile, srcnodata=-32768, dstnodata, of="SAGA
 #'
 #' @description combines some grids and changes coordinate system
 #'
-#' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
+#' @param saga_env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #'
-#' @param outputCRS character vector specifying EPSG for coordinate system to
+#' @param output_crs character vector specifying EPSG for coordinate system to
 #' output
 #'
 #' @keywords internal
 #'
 #' @export
 #===============================================================================
-MosaicAndWarp <- function(gridnames, DEM.path, saga.env,
-                  inputCRS="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs",
-                  outputCRS="+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96
+MosaicAndWarp <- function(gridnames, DEM_path, saga_env,
+                  input_crs="+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs",
+                  output_crs="+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96
                   +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs"){
   #TODO: this could be made faster I expect (maybe use the point as mosaic bounds?)
   # First, convert tiles to sgrd format so that saga can use them
@@ -449,36 +465,41 @@ MosaicAndWarp <- function(gridnames, DEM.path, saga.env,
   # and finally, warp the mosaicked grid using gdal into the desired CRS
 
   temp.files <- character()
-    for (i in seq(1,length(gridnames))){
+
+  for (i in seq(1, length(gridnames))){
     x <- gridnames[i]
-    outputfile <- file.path(saga.env$workspace, paste("temp",i,'.sdat',sep='')) # make dummy temp file
-    input.DEM <- GetTilePathsHS(x, DEM.path)
+    outputfile <- file.path(saga_env$workspace,
+                            paste("temp", i, ".sdat", sep = "")) # make dummy temp file
+
+    input.DEM <- GetTilePathsHS(x, DEM_path)
     temp.files <- c(temp.files, outputfile)
-    gdal_warp2SAGA(input.DEM, outputfile, outputCRS = inputCRS)
+    gdal_warp2SAGA(input.DEM, outputfile, output_crs = input_crs)
   }
-  temp.hdrs.path <- gsub("sdat", "sgrd", temp.files)
-  temp.hdrs <- lapply(temp.hdrs.path, read.sgrd.header)
-  temp.hdrs <- do.call(rbind, temp.hdrs)
 
-  minx <- as.character(floor(min(as.numeric(temp.hdrs$POSITION_XMIN))))
-  miny <- as.character(floor(min(as.numeric(temp.hdrs$POSITION_YMIN))))
-  maxx <- as.character(max(as.numeric(temp.hdrs$POSITION_XMIN) +
-             as.numeric(temp.hdrs$CELLCOUNT_X) * as.numeric(temp.hdrs$CELLSIZE)))
+  temp_hdrs_path <- gsub("sdat", "sgrd", temp.files)
+  temp_hdrs <- lapply(temp_hdrs_path, read.sgrd.header)
+  temp_hdrs <- do.call(rbind, temp_hdrs)
 
-  maxy <- as.character(max(as.numeric(temp.hdrs$POSITION_YMIN) +
-             as.numeric(temp.hdrs$CELLCOUNT_Y) * as.numeric(temp.hdrs$CELLSIZE)))
+  minx <- as.character(floor(min(as.numeric(temp_hdrs$POSITION_XMIN))))
+  miny <- as.character(floor(min(as.numeric(temp_hdrs$POSITION_YMIN))))
+  maxx <- as.character(max(as.numeric(temp_hdrs$POSITION_XMIN) +
+             as.numeric(temp_hdrs$CELLCOUNT_X) * as.numeric(temp_hdrs$CELLSIZE)))
 
-  cellsize <- temp.hdrs$CELLSIZE[1]
+  maxy <- as.character(max(as.numeric(temp_hdrs$POSITION_YMIN) +
+             as.numeric(temp_hdrs$CELLCOUNT_Y) * as.numeric(temp_hdrs$CELLSIZE)))
+
+  cellsize <- temp_hdrs$CELLSIZE[1]
 
 
   #mosaic
-  inputs <- paste(temp.hdrs.path, collapse=';')
-  mosaicked <- file.path(saga.env$workspace, "temp_mosaicked.sdat")
-  MoisaicRS(inputs, mosaicked, saga.env=saga.env, xmin=minx, xmax=maxx,
-            ymin=miny, ymax=maxy, cellsize=cellsize)
+  inputs <- paste(temp_hdrs_path, collapse = ";")
+  mosaicked <- file.path(saga_env$workspace, "temp_mosaicked.sdat")
+  MoisaicRS(inputs, mosaicked, saga_env = saga_env, xmin = minx, xmax = maxx,
+            ymin = miny, ymax = maxy, cellsize = cellsize)
 
-  warped.output <-  file.path(saga.env$workspace, "temp_mosaicked_warped.sdat")
-  gdal_warp2SAGA(mosaicked, warped.output, outputCRS = outputCRS)
+  warped.output <-  file.path(saga_env$workspace, "temp_mosaicked_warped.sdat")
+  gdal_warp2SAGA(mosaicked, warped.output, output_crs = output_crs)
+
   return(warped.output)
 }
 
@@ -487,7 +508,7 @@ MosaicAndWarp <- function(gridnames, DEM.path, saga.env,
 #'
 #' @description Builds a channel network from a DEM.
 #'
-#' @param in.DEM character string pointing to the *.sgrd path of a
+#' @param in_DEM character string pointing to the *.sgrd path of a
 #' (hydrologically appropriate) DEM
 #'
 #' @param init.grid (optional) character string pointing to a flow accumulation
@@ -496,36 +517,41 @@ MosaicAndWarp <- function(gridnames, DEM.path, saga.env,
 #' @param out.shape character string naming a shapefile open for writing which
 #' will be the channel network
 #'
-#' @param upstream.threshold integer, number of upstream cells required to
+#' @param upstr_threshold integer, number of upstream cells required to
 #' initiate channel growth. A smaller number will yield more channels and will
 #' snap to smaller streams. Larger numbers will produce only major channel
 #'  branches. For a 50k DEM, numbers between 20,000 and 50,000 are appropriate
 #'  to reproduce the main channel network without many small branches.
 #'
-#' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
+#' @param saga_env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #' character string  Mosaic 'grid_tools' module 3
 #'
 #' @return character string path to channel network shapefile
 #'
 #' @export
 #===============================================================================
-ChannelNetworkRS <- function(in.DEM, init.grid, out.shape,
-                             upstream.threshold=35000, saga.env, verbose=F){
-  print("Building Channel Network...")
+ChannelNetworkRS <- function(in_DEM, init.grid, out.shape,
+                             upstr_threshold = 35000, saga_env, verbose = F){
+
+
   if (missing(init.grid)){
-    init.grid <- FlowAccumulationRS(in.DEM, saga.env=saga.env)
+    init.grid <- FlowAccumulationRS(in_DEM, saga_env = saga_env)
   }
+
   if (missing(out.shape)){
-    out.shape <- gsub("\\.s[gd][ra][dt]", "_channels\\.shp", in.DEM)
+    out.shape <- gsub("\\.s[gd][ra][dt]", "_channels\\.shp", in_DEM)
   }
-  RSAGA::rsaga.geoprocessor(lib = 'ta_channels', module=0, env=saga.env,
+
+  print("Building Channel Network...")
+
+  RSAGA::rsaga.geoprocessor(lib = "ta_channels", module = 0, env = saga_env,
                             show.output.on.console = verbose,
                             check.module.exists = FALSE, param = list(
-                              ELEVATION=in.DEM,
-                              INIT_GRID=init.grid,
-                              SHAPES=out.shape,
-                              INIT_METHOD=2,
-                              INIT_VALUE=upstream.threshold
+                              ELEVATION   = in_DEM,
+                              INIT_GRID   = init.grid,
+                              SHAPES      = out.shape,
+                              INIT_METHOD = 2,
+                              INIT_VALUE  = upstr_threshold
                             ))
   return(out.shape)
 }
@@ -534,25 +560,27 @@ ChannelNetworkRS <- function(in.DEM, init.grid, out.shape,
 #' @title Generate Flow Accumulation using RSAGA
 #'
 #' @description Calculates flow accumulation
-#' @param in.DEM character string pointing to the *.sgrd path of a
+#' @param in_DEM character string pointing to the *.sgrd path of a
 #' (hydrologically appropriate) DEM
 #' @param output_grid character string pointing to the *.sgrd path of the
 #' output file
-#' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
+#' @param saga_env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #' @return path to output flow accumulation grid
 #' @export
 #===============================================================================
-FlowAccumulationRS <- function(in.DEM, out_grid, saga.env, verbose=F){
-  if (missing(out_grid)) out_grid <- gsub("\\.sgrd", "_flowacc\\.sgrd", in.DEM)
+FlowAccumulationRS <- function(in_DEM, out_grid, saga_env, verbose = F){
+  if (missing(out_grid)) out_grid <- gsub("\\.sgrd", "_flowacc\\.sgrd", in_DEM)
   print("Calculating Flow Accumulation...")
-  RSAGA::rsaga.geoprocessor(lib = 'ta_hydrology', module=0, env=saga.env,
+
+  RSAGA::rsaga.geoprocessor(lib = "ta_hydrology", module = 0, env = saga_env,
                             show.output.on.console = verbose,
                             check.module.exists = FALSE, param = list(
-                      ELEVATION=in.DEM,
-                      CAREA=out_grid,  # listed as FLOW and FLOW_UNIT in the GUI
-                      CAREA_UNIT=0, # number of cells (less accurate but faster)
-                      METHOD=0     # deterministic 8
+                      ELEVATION  = in_DEM,
+                      CAREA      = out_grid,  # listed as FLOW and FLOW_UNIT in the GUI
+                      CAREA_UNIT = 0, # number of cells (less accurate but faster)
+                      METHOD     = 0     # deterministic 8
                             ))
+
   return(out_grid)
 }
 
@@ -567,31 +595,36 @@ FlowAccumulationRS <- function(in.DEM, out_grid, saga.env, verbose=F){
 #'
 #' @param grid grid whose values will be sampled
 #'
-#' @param saga.env A SAGA geoprocessing object.  Suggested version is 2.2.2.
+#' @param saga_env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #'
 #' @return vector of grid values the same length as the number of points
 #'
 #' @export
 #===============================================================================
-SampleRasterRS <- function(point, grid, saga.env, verbose=F){
+SampleRasterRS <- function(point, grid, saga_env, verbose=F){
   print("Sampling raster...")
+
   if (grepl("Spatial", class(point))){
-    rgdal::writeOGR(point, dsn=file.path(saga.env$workspace, "station.shp"),
-                    layer="station.shp", driver="ESRI Shapefile")
-    point <- file.path(saga.env$workspace, "station.shp")
+    rgdal::writeOGR(point, dsn = file.path(saga_env$workspace, "station.shp"),
+                    layer = "station.shp", driver = "ESRI Shapefile")
+    point <- file.path(saga_env$workspace, "station.shp")
   }
+
   sampled <- gsub("\\.shp", "_gridsample\\.shp", point)
-  RSAGA::rsaga.geoprocessor(lib='shapes_grid', module=0, env=saga.env,
+
+  RSAGA::rsaga.geoprocessor(lib = "shapes_grid", module = 0, env = saga_env,
                             show.output.on.console = verbose,
                      check.module.exists = FALSE,
-                     param=list(
-                       SHAPES=point,
-                       GRIDS=grid,
-                       RESULT=sampled,
-                       INTERPOL=0
+                     param = list(
+                       SHAPES   = point,
+                       GRIDS    = grid,
+                       RESULT   = sampled,
+                       INTERPOL = 0
                      ))
+
   x <- invisible(rgdal::readOGR(sampled))
-  x <- x@data[,ncol(x@data)]
+  x <- x@data[, ncol(x@data)]
+
   return(x)
 }
 
@@ -605,35 +638,35 @@ SampleRasterRS <- function(point, grid, saga.env, verbose=F){
 #' Must be in same coordinates system as DEM and coordinate system must be
 #' projected (not lat/long).  Must have longitude and latitude attributes.
 #'
-#' @param saga.env an rsaga environment object
+#' @param saga_env an rsaga environment object
 #'
 #' @param outdir Directory to output final upslope shapefile
 #'
 #' @param pointbuffer numeric, how much should the point be buffered (calculates
 #' upslope basin of buffered area)
 #'
-#' @param iterate.to numeric, if greater than pointbuffer, checks that the
+#' @param iterate_to numeric, if greater than pointbuffer, checks that the
 #' calculated upslope area is at least 0.5 sq. km larger than the
 #'
-#' @param iterate.incr numeric, by how much should the buffer be grown each
-#' iteration (ignored if iterate.to is equal to pointbuffer)
+#' @param iterate_incr numeric, by how much should the buffer be grown each
+#' iteration (ignored if iterate_to is equal to pointbuffer)
 #'
-#'  @param iterate.thres numeric, how many square kilometers difference between
+#'  @param iterate_thres numeric, how many square kilometers difference between
 #'  the calculated area and initial point buffer should be required to trigger
-#'  another iteration (ignored if iterate.to is equal to pointbuffer)
+#'  another iteration (ignored if iterate_to is equal to pointbuffer)
 #'
-#' @param DEM.source character, one of: c('CDED', 'NED', 'CDEM, CDSM', 'SHEDS').
-#' Ignored if a DEM file is supplied to DEM.path
+#' @param DEM_source character, one of: c('CDED', 'NED', 'CDEM, CDSM', 'SHEDS').
+#' Ignored if a DEM file is supplied to DEM_path
 #'
-#' @param DEM.path One of:
+#' @param DEM_path One of:
 #'  (1) a file path to a directory containing DEM files either in the the format
-#'  n%%w0%%_con_grid.sgrd (if DEM.source is 'SHEDS') or a directory to which DEM
-#'  tiles will be downloaded (if DEM.source='CDEM', 'CDED' etc.),
+#'  n%%w0%%_con_grid.sgrd (if DEM_source is 'SHEDS') or a directory to which DEM
+#'  tiles will be downloaded (if DEM_source='CDEM', 'CDED' etc.),
 #'  (2) a file path to a dem file in SAGA format.  The DEM should be in a
 #'  projected coordinate system and the coordinatesystem should match that of
 #'  the point (e.g. Canada Albers Conformal Conic)
 #'
-#'  @param dem.clip.square How big (in m) a clip should be generated from the
+#'  @param clip_size How big (in m) a clip should be generated from the
 #'  original DEM (too big doesn't work and is slower)
 #'
 #'  @param projected.CRS character vector (proj4) specifying "working" CRS in
@@ -645,7 +678,7 @@ SampleRasterRS <- function(point, grid, saga.env, verbose=F){
 #' @param method character, one of ('D8', 'DINF'), specifying the hydrological
 #' pathing model
 #'
-#' @param upstream.threshold integer, number of upstream cells required to
+#' @param upstr_threshold integer, number of upstream cells required to
 #' initiate channel growth. A smaller number will yield more channels and will
 #'  snap to smaller streams. Larger numbers will produce only major channel
 #'   branches. For a 50k DEM, numbers between 20,000 and 50,000 are appropriate
@@ -656,134 +689,151 @@ SampleRasterRS <- function(point, grid, saga.env, verbose=F){
 #'
 #' @export
 #===============================================================================
-UpslopeDEM <- function(point, DEM.path, DEM.source='NTS', saga.env, outdir,
-                       pointbuffer=50, dem.clip.square=50000,
-                       projected.CRS, iterate.to=150, iterate.incr=50,
-                       iterate.thres=0.4, method="D8", upstream.threshold=35000,
-                       ...){
+UpslopeDEM <- function(point, DEM_path, DEM_source = "NTS", saga_env, outdir,
+                       pointbuffer = 50, clip_size = 50000,
+                       projected.CRS, iterate_to = 150, iterate_incr = 50,
+                       iterate_thres = 0.4, method = "D8",
+                       upstr_threshold = 35000, ...){
 
   # set some parameters
-  method <- switch(toupper(method), "D8"=0, "DINF"=1)
-  snapped<-F
-  pb.init <- pointbuffer
+  method  <- switch(toupper(method), "D8" = 0, "DINF" = 1)
+  snapped <- F
+  pb_init <- pointbuffer
 
   #sanity checks
   if (missing(projected.CRS)){
     projected.CRS <- GetProj4("AlbersEqualAreaConic")
   }
-  iterate.to <- max(c(iterate.to, pointbuffer))
-  in.DEM <- gsub("\\.sdat$", "\\.sgrd", DEM.path)
+  iterate_to <- max(c(iterate_to, pointbuffer))
+  in_DEM <- gsub("\\.sdat$", "\\.sgrd", DEM_path)
 
   # prepare workspace
   oldwd <- getwd()
-  setwd(saga.env$workspace)
-  outdir <- gsub("[\\/]$","",outdir)
+  setwd(saga_env$workspace)
+  outdir <- gsub("[\\/]$", "", outdir)
 
   # get name of station
-  station.name <- point@data[1,grepl("^\\d{2}[[:alpha:]]{2}\\d{3}$", point@data)]
-  print(station.name)
-  final.name <- file.path(outdir, paste(station.name,"_upslope.shp",sep=''))
+  station_name <- point@data[1, grepl("^\\d{2}[[:alpha:]]{2}\\d{3}$", point@data)]
+  print(station_name)
+  final_name <- file.path(outdir, paste(station_name, "_upslope.shp", sep = ""))
 
   #if point not in proper crs, convert it
   if (point@proj4string@projargs != projected.CRS){
-    point <- sp::spTransform(point, CRSobj = CRS(projected.CRS))
+    point <- sp::spTransform(point, CRSobj = sp::CRS(projected.CRS))
   }
 
   # Find missing DEM if necessary / Convert to sgrd if necessary.
-  if (!grepl("\\.sgrd$", in.DEM)){  # if not an SGRD file (then we expect a directory or a list of names)
+  if (!grepl("\\.sgrd$", in_DEM)){
+    # if not an SGRD file (then we expect a directory or a list of names)
 
-    if (tolower(DEM.source)=='sheds'){
+    if (tolower(DEM_source) == "sheds"){
       name <- HydroMosaic(point@data$longitude, point@data$latitude,
-                          tol=dem.clip.square)
+                          tol = clip_size)
 
-      if (length(name)==1){
-        check.if.exists <- list.files(in.DEM, pattern=paste(name, ".sgrd", sep=''),
+      if (length(name) == 1){
+        matching_files <- list.files(in_DEM,
+                                      pattern = paste(name, ".sgrd", sep = ""),
                                       full.names = T, recursive = T)
 
-        if (length(check.if.exists) ==0){  #  if sgrid doesn't exist, create it
-          original.DEM <- GetTilePathsHS(name, in.DEM)
+        if (length(matching_files) == 0){
+          #  if sgrid doesn't exist, create it
+          original.DEM <- GetTilePathsHS(name, in_DEM)
           print(sprintf("Converting %s DEM to sgrd...", original.DEM))
-          gdal_warp2SAGA(original.DEM, outputCRS = projected.CRS)
+          gdal_warp2SAGA(original.DEM, output_crs = projected.CRS)
         }
-        in.DEM <- list.files(in.DEM, pattern=paste(name,".sgrd$", sep=''),
+
+        in_DEM <- list.files(in_DEM, pattern = paste(name, ".sgrd$", sep = ""),
                              full.names = T, recursive = T)
 
-        print(sprintf("Using %s as input DEM", in.DEM))
+        print(sprintf("Using %s as input DEM", in_DEM))
 
-      }else if (length(name) > 1){ # need to mosaic and transform
-        print('Multiple grids Necessary...')
-        original.DEM <- GetTilePathsHS(name, in.DEM)
-        in.DEM <- MosaicAndWarp(gridnames = name, DEM.path = in.DEM,
-                                saga.env = saga.env, outputCRS = projected.CRS)
+      }else if (length(name) > 1){
+        # need to mosaic and transform
+        print("Multiple grids Necessary...")
+        original.DEM <- GetTilePathsHS(name, in_DEM)
+        in_DEM <- MosaicAndWarp(gridnames = name, DEM_path = in_DEM,
+                                saga_env = saga_env, output_crs = projected.CRS)
       }
 
-    }else if (toupper(DEM.source) %in% c('CDED','NED', 'CDEM', 'CDSM')){
-      print(DEM.source) #debug only
-      in.DEM <- OverlayDEM(point, DEM.dir=DEM.path, output.dir=saga.env$workspace,
-                           product = DEM.source, tol=dem.clip.square) # clip from DEM
+    }else if (toupper(DEM_source) %in% c("CDED", "NED", "CDEM", "CDSM")){
+      print(DEM_source) #debug only
+      in_DEM <- OverlayDEM(point, DEM_dir = DEM_path,
+                           output.dir = saga_env$workspace,
+                           product = DEM_source,
+                           tol = clip_size) # clip from DEM
 
-      dem.clip.square <- 0
+      clip_size <- 0
     }else{
       print("Could not find suitable DEM in folder")
+
       return()
     }
   }
 
   # Test if point is outside of raster limits (e.g. in USA)
-  value <- SampleRasterRS(point = point, grid = in.DEM, saga.env=saga.env )
+  value <- SampleRasterRS(point = point, grid = in_DEM, saga_env = saga_env )
 
   nodata <- F
   if (is.na(value)){
     print("station outside of CDED coverage, switching to NED data")
-    in.DEM <- OverlayDEM(point, DEM.dir=DEM.path, output.dir=saga.env$workspace,
-                         product = 'NED', tol=dem.clip.square)
+    in_DEM <- OverlayDEM(point, DEM_dir = DEM_path,
+                         output.dir = saga_env$workspace, product = "NED",
+                         tol = clip_size)
     # nodata <- T
     # setwd(oldwd)
-    # return(list(final.name=NA, pointbuffer=NA, iterate.thres=iterate.thres, iterate.to=iterate.to,
-    #             nodata=nodata, snapped=F, snapped=snapped, snap.dist=NA))
+    # return(list(final_name=NA, pointbuffer=NA, iterate_thres=iterate_thres,
+    #             iterate_to=iterate_to,
+    #             nodata=nodata, snapped=F, snapped=snapped, snap_dist=NA))
   }
 
   # Clip grid to point
-  if (dem.clip.square > 0){
-    ClipGridRS(point, in.DEM, 'clipped.sgrd', saga.env, tol=dem.clip.square, ...)
+  if (clip_size > 0){
+    ClipGridRS(point, in_DEM, "clipped.sgrd", saga_env,
+               tol = clip_size, ...)
   }
 
   # Fill Sinks
-  FillSinksRS(ifelse((dem.clip.square > 0),'clipped.sgrd',in.DEM),
-              'filled.sgrd', saga.env, MINSLOPE=0.01, ...)
+  FillSinksRS(ifelse( (clip_size > 0), "clipped.sgrd", in_DEM),
+              "filled.sgrd", saga_env, MINSLOPE = 0.01, ...)
 
   snapped <- FALSE
-  snap.dist <- NA
+  snap_dist <- NA
   run <- TRUE
+
   while (run){
     # Point to Grid
-    Point2GridRS(point, 'filled.sgrd', 'target.sgrd',  saga.env,
-                 buffer.dist=pointbuffer, ...)
+    Point2GridRS(point, "filled.sgrd", "target.sgrd",  saga_env,
+                 buffer_dist = pointbuffer, ...)
 
     # Upslope
-    upslope <- UpslopeAreaRS('filled.sgrd', 'target.sgrd', 'upslope.sgrd',
-                             saga.env, method=method, ...)
-    if (method==1){
-      upslope <- GridThresholdRS(upslope, threshold.value = 0, saga.env=envi)
+    upslope <- UpslopeAreaRS("filled.sgrd", "target.sgrd", "upslope.sgrd",
+                             saga_env, method = method, ...)
+    if (method == 1){
+      upslope <- GridThresholdRS(upslope,
+                                 threshold_value = 0,
+                                 saga_env = saga_env)
     }
 
     # Find Area
-    area <- GridVolumeRS(upslope, level = 99, saga.env=envi) # returns in m2
+    area <- GridVolumeRS(upslope, level = 99, saga_env = saga_env) #  (in m2)
 
-    if (abs(area - pi*pointbuffer**2)*1e-6 < iterate.thres |
-        pointbuffer > iterate.to ){  # if upslope area didn't work, try widening search radius
-      pointbuffer <- pointbuffer + iterate.incr
+    if (abs(area - pi * pointbuffer ** 2) * 1e-6 < iterate_thres |
+        pointbuffer > iterate_to ){
 
-      if (pointbuffer > iterate.to | snapped==TRUE){
-        if (snapped==TRUE){
+      # if upslope area didn't work, try widening search radius
+      pointbuffer <- pointbuffer + iterate_incr
+
+      if (pointbuffer > iterate_to | snapped == TRUE){
+        if (snapped == TRUE){
           run <- FALSE
         }else{
           snapped <- TRUE
-          snapped.pt <- SnapToPourPoint(point, 'filled.sgrd', saga.env=saga.env,
-                                        upstream.threshold=upstream.threshold)
-          point <- snapped.pt$station
-          snap.dist <- snapped.pt$distance
-          pointbuffer <- pb.init
+          snapped_pt <- SnapToPourPoint(point, "filled.sgrd",
+                                        saga_env = saga_env,
+                                        upstr_threshold = upstr_threshold)
+          point <- snapped_pt$station
+          snap_dist <- snapped_pt$distance
+          pointbuffer <- pb_init
         }
       }
     }else{
@@ -792,12 +842,11 @@ UpslopeDEM <- function(point, DEM.path, DEM.source='NTS', saga.env, outdir,
   }
 
   # Convert to polygon
-  Grid2PolyRS(upslope, final.name, saga.env, ...)
+  Grid2PolyRS(upslope, final_name, saga_env, ...)
 
   # put workspace back the way it was
   setwd(oldwd)
-  return(list(final.name=final.name, pointbuffer=pointbuffer,
-              iterate.thres=iterate.thres, iterate.to=iterate.to,
-              nodata=nodata, snapped=snapped, snap.dist=snap.dist))
+  return(list(final_name = final_name, pointbuffer = pointbuffer,
+              iterate_thres = iterate_thres, iterate_to = iterate_to,
+              nodata = nodata, snapped = snapped, snap_dist = snap_dist))
 }
-

@@ -13,6 +13,8 @@
 #' @param upstream a character vector of stations in table that are upstream of
 #' the target station.
 #'
+#' @param set_to toggle between setting upstream (1) or not upstream(0)
+#'
 #' @return Does not return a value, the table is modified in-place.
 #'
 #' @examples
@@ -49,6 +51,8 @@ set_upstream <- function(station, table, upstream, set_to=1){
 #' @param upstream a character vector of stations in table that are downstream of
 #' the target station.
 #'
+#' @param set_to toggle between setting upstream (1) or not upstream(0)
+#'
 #' @return Does not return a value, the table is modified in-place.
 #'
 #' @examples
@@ -73,6 +77,8 @@ set_downstream <- function(station, table, downstream, set_to=1){
 #' stations.
 #'
 #' @param next_upstream the next station upstream of the target station
+#'
+#' @param set_to toggle between setting upstream (1) or not upstream(0)
 #'
 #' @examples
 #' M  <- initialize_matrix_from_stations(c('stn1', 'stn2', 'stn3', 'stn4'))
@@ -99,6 +105,8 @@ set_upstream_recursive <- function(station, table, next_upstream, set_to=1){
 #'
 #' @param next_downstream the next station downstream of the target station
 #'
+#' @param set_to toggle between setting upstream (1) or not upstream(0)
+#'
 #' @examples
 #' M  <- initialize_matrix_from_stations(c('stn1', 'stn2', 'stn3', 'stn4', 'stn5'))
 #' set_upstream('stn1', M, c('stn2', 'stn3', 'stn4'))
@@ -106,13 +114,13 @@ set_upstream_recursive <- function(station, table, next_upstream, set_to=1){
 #' set_downstream_recursive('stn5', M, 'stn3')
 #' get_downstream('stn5', M)
 #===============================================================================
-set_downstream_recursive <- function(station, table, next_downstream, set_to){
+set_downstream_recursive <- function(station, table, next_downstream, set_to=1){
   # get all downstream of next_downstream
   all_down <- get_downstream(next_downstream, table)
 
   # Set target station as upstream of
   set_downstream(station, table = table,
-                 downstream=c(all_down, next_downstream), set_to=set_to)
+                 downstream = c(all_down, next_downstream), set_to=set_to)
 }
 
 #===============================================================================
@@ -126,6 +134,7 @@ set_downstream_recursive <- function(station, table, next_downstream, set_to){
 #'
 #' @param table a data.table describing upstream / downstream relationships between
 #' stations.
+#'
 #' @param next_upstream (optional) the next station upstream of the target
 #' station. If omitted, no upstream stations will be set.
 #'
@@ -144,11 +153,11 @@ set_downstream_recursive <- function(station, table, next_downstream, set_to){
 #===============================================================================
 set_relative_position <- function(station, table,
                                      next_upstream, next_downstream){
-  if (!missing(next_upstream) & !is.na(next_upstream)){
+  if (!missing(next_upstream) & ! is.na(next_upstream)){
     set_upstream_recursive(station=station, table=table,
                            next_upstream = next_upstream)
   }
-  if (!missing(next_downstream) & !is.na(next_downstream)){
+  if (!missing(next_downstream) & ! is.na(next_downstream)){
     set_downstream_recursive(station = station, table = table,
                              next_downstream = next_downstream)
   }
@@ -201,8 +210,8 @@ get_upstream <- function(station, table){
 #'  @export
 #===============================================================================
 get_downstream <- function(station, table){
-  downstream <- as.logical(table[, station, with=F] == 1)
-  result <- table[, 'ID', with=F][downstream]
+  downstream <- as.logical(table[, station, with = F] == 1)
+  result <- table[, 'ID', with = F][downstream]
   return(result[[1]])
 }
 
@@ -244,7 +253,7 @@ most_downstream <- function(table, diagnl=9){
 #' @param diagnl integer used along the diagonal of the matrix to indicate
 #' station identity (neither upstream nor downstream)
 #'
-#' @return an [n × n+1] data.table
+#' @return an [n x n+1] data.table
 #'
 #' @examples
 #' r <- initialize_matrix_from_stations(c('stn1', 'stn2', 'stn3'))
@@ -314,13 +323,13 @@ add_station_to_table <- function(stations, table){
 #'y is upstream of z, then x is upstream of z. This tests that assumption for a
 #'matrix
 #'
-#' @param table: a data table created from initialize_matrix_from_stations. An
+#' @param table  a data table created from initialize_matrix_from_stations. An
 #'(n x n+1) data.table with first column named "ID" and all other columns
 #'named according to station number. Row i and column i+1 should correspond to
 #'the same station.
 #'
 #' @return A list with an element for every x,y station pair that violates
-#' the transitivity assumption
+#' the transitivity assumption or an empty vector
 #'
 #' @export
 #===============================================================================
@@ -330,6 +339,10 @@ check_transitivity <- function(table){
 
   # Find which entries in M violate transitivity assumption
   intransitive <- M != 0 | (M == 0 & ((M - M %*% M) == 0))
+
+  if (all(intransitive)){
+    return(character(0))
+  }
 
   #return names that correspond to FALSE values in intransitive
   out <- apply(intransitive, 1, function(x) table[["ID"]][!x])
@@ -399,9 +412,13 @@ upstream_stations_from_delineation <- function(basin, stations, target_station,
 #' @description  Use a folder of basin delineations to define upstream relations
 #' and populate upstream relations matrix
 #'
-#' @param table a HYBAS spatial polygon object
-#' @param polygon_folder The HYBAS.ID of the sub-basin from which to go upstream
+#' @param table a data table created from initialize_matrix_from_stations. An
+#'(n x n+1) data.table with first column named "ID" and all other columns
+#'named according to station number. Row i and column i+1 should correspond to
+#'the same station.
+#' @param polygon_folder
 #' @param station_pts spatialpointsdataframe of monitoring stations
+#' @param station_number column name identifying the station number
 #' @return A character vector of station IDs
 #' @keywords internal
 #' @export
@@ -433,4 +450,186 @@ populate_table_from_delineations <- function(table, polygon_folder,
                     name))
     }
   }
+}
+
+
+#===============================================================================
+#' Subset table
+#'
+#' @param table a data table created from initialize_matrix_from_stations. An
+#'(n x n+1) data.table with first column named "ID" and all other columns
+#'named according to station number. Row i and column i+1 should correspond to
+#'the same station.
+#'
+#' @param pattern regular expression to match station names.
+#'
+#' @param stn_list a list of stations to include in the subset.  Ignored if pattern
+#' is provided
+#'
+#' @return a data.table containing a subset of rows and columns from the
+#' input table
+#'
+#' @details to return only stations within a particular drainage area (e.g.
+#' stations beginning with '02'), use pattern='^xx' where xx is the drainage
+#' basin number.  So "^01" would return stations from
+#'
+#===============================================================================
+subset_table <- function(table, pattern, stn_list){
+
+  if (!missing(pattern)){
+    include <- names(table)[grepl(pattern, names(table))]
+
+  }else if (!missing(stn_list)){
+    include <- sort(stn_list) # sort to preserve diagonal
+
+  }else{
+    stop("Provide either a regex pattern or a list of stations")
+  }
+
+  Msub <- M[, c("ID", include), with = FALSE]
+  Msub <- Msub[include]
+
+  return(Msub)
+}
+
+## save and load
+
+save_table <- function(table, file_name){
+  fwrite(x = table, file = file_name, quote = F)
+}
+
+load_table <- function(file_name){
+  M <- fread(file_name, header = TRUE, key = "ID", data.table = TRUE)
+  return(M)
+}
+
+#===============================================================================
+#' @title Read a station coverage text file
+#'
+#' @param coverage_file path to a coverage textfile describing which stations
+#' are upstream of each station
+
+#' @return a list whose names correspond to stations and whose entries correspond
+#' to the stations upstream of the named station.
+#===============================================================================
+read_coverage_tree <- function(coverage_file){
+  # read file line-by-line
+  coverage <- readsimple(coverage_file)
+
+  #coverage[1] <- gsub("\\{", "", coverage[1])
+  #coverage[length(coverage)] <- gsub("\\}", "", coverage[length(coverage)])
+
+  # remove  quotes, whitespace, and trailing comma
+  coverage[] <- sapply(coverage, gsub, pattern=",$", replacement= "")
+  coverage[] <- sapply(coverage, gsub, pattern="\\'", replacement= "")
+  coverage[] <- sapply(coverage, gsub, pattern=" ", replacement= "")
+
+
+  #remove brackets
+  coverage[] <- sapply(coverage, gsub, pattern = "\\{|\\[|\\}|\\]", replacement = "")
+
+  names <- as.character(sapply(coverage, function(x) strsplit(x, split = ":")[[1]][1]))
+  upstr <- as.character(sapply(coverage, function(x) strsplit(x, split = ":")[[1]][2]))
+  upstr <- strsplit(upstr, ",")
+  names(upstr) <- names
+
+  # ensure no duplicate names
+  if (any(duplicated(names(upstr)))){
+    warning(sprintf("Duplicated names in tree removed: %s",
+                    names[duplicated(names(upstr))]))
+    upstr <- upstr[!duplicated(names(upstr))]
+  }
+  return(upstr)
+}
+
+#===============================================================================
+#' @title Get upstream stations in tree
+#'
+#' @param filepath character string path to coverage file describing upstream/
+#' downstream station relationships
+#===============================================================================
+readsimple <-  function(filepath) {
+  con <- file(filepath, "r")
+  x <- character()
+  while ( TRUE ) {
+    line = readLines(con, n = 1)
+
+    if ( length(line) == 0 ) {
+      break
+    }
+
+    if (grepl(":.*\\[.*", line)){
+      x <- c(x, line)
+    }else{
+      x[length(x)] <- paste0(x[length(x)], line)
+    }
+
+    if (grepl("\\}$", line)){
+      print('yea')
+      print(line)
+      break
+    }
+  }
+
+  close(con)
+
+  return(x)
+}
+
+#===============================================================================
+#' @title Get upstream stations in tree
+#'
+#' @param station name of station
+#' @param tree list object returned from read_coverage_tree()
+#' @return list of stations immediately upstream of the specified station
+#===============================================================================
+tree_get_upstream <- function(station, tree){
+  upstr <- as.character(unlist(tree[station]))
+
+  if (all(is.null(upstr))){
+    return(NA)
+  }
+
+  return(upstr)
+}
+
+#===============================================================================
+#' @title Get all upstream stations from a tree graph
+#'
+#' @param station name of station
+#' @param tree list object returned from read_coverage_tree()
+#' @return list of all stations upstream of the specified station
+#===============================================================================
+tree_get_all_upstream <- function(station, tree){
+  upstr <- character()
+  next_up <- tree_get_upstream(station, tree)
+
+  while (! all(is.na(next_up))){
+    next_up <- as.character(unlist(na.omit(next_up)))
+    upstr <- c(upstr, next_up)
+    next_up <- sapply(next_up, tree_get_upstream, tree = tree)
+    next_up <- as.character(unlist(next_up))
+  }
+
+  return(upstr)
+}
+
+#===============================================================================
+#' @title Convert station tree to matrix
+#'
+#' @description converts an upstream/downstream network map from a tree-like
+#' structure to a matrix structure.
+#'
+#' @param tree list object returned from read_coverage_tree()
+#' @return Matrix of station upstream/downstream relationships
+#===============================================================================
+tree_to_matrix <- function(tree){
+  stn <- names(tree)
+  M <- initialize_matrix_from_stations(sort(stn)) # sort to preserve diagonal
+  lapply(stn, function(s) set_upstream(station = s,
+                                       table = M,
+                                       upstream = tree_get_all_upstream(s, tree =  tree),
+                                       set_to = 1))
+  M
+  return(M)
 }
