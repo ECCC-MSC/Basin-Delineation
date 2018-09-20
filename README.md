@@ -1,9 +1,10 @@
-#README
+# README
 
 ## Introduction
+These scripts were created to generate basin delineations and other value-added products from Water Survey of Canada hydrometric stations.
 
 ## Dependencies
-Most dependencies will download automatically provided that you install from a built.  Others will need to be downloaded and installed manually such as [HYDAT](https://github.com/CentreForHydrology/HYDAT)
+Most dependencies will download automatically provided that you install from a built tar.gz file.  Others will need to be downloaded and installed manually such as [HYDAT](https://github.com/CentreForHydrology/HYDAT)
 
 ## Code
 
@@ -20,7 +21,7 @@ The R package consists of the following files:
 
 - **basin_creation.R:**  Relies on above files to create basin delineations from a few input parameters such as station names/numbers and coordinates
 
-- **upstReam.R:** Functions to construct and query large matrices describing upstream/downstream station relationships
+- **upstReam.R:** Used to construct and query large matrices describing upstream/downstream hydrometric station relationships
 
 
 
