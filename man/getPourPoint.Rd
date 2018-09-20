@@ -7,14 +7,16 @@
 getPourPoint(point, pourpoint)
 }
 \arguments{
-\item{point}{a SpatialPointsDataFrame representing one station. Must have a column named 'station_number'}
+\item{point}{a SpatialPointsDataFrame representing one station. Must have a
+column named 'station_number'}
 
-\item{pourpoint}{a SpatialPointsDataFrame of pourpoints. Must have a column named 'station_number'}
+\item{pourpoint}{a SpatialPointsDataFrame of pourpoints. Must have a column
+named 'station_number'}
 }
 \value{
 A SpatialPointsDataFrame with data identical to the original point,
-and the new geometry corresponding to the pour point. If no matching pour point is found,
-the original station point is returned
+and the new geometry corresponding to the pour point. If no matching pour
+point is found, the original station point is returned
 }
 \description{
 changes the location of a station (point) to that of its

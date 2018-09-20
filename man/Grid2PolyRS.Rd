@@ -4,17 +4,19 @@
 \alias{Grid2PolyRS}
 \title{Grid to polygon}
 \usage{
-Grid2PolyRS(in.GRD, out.poly, saga.env, CLASS_ID = 100, verbose = F)
+Grid2PolyRS(in_grd, out_poly, saga_env, CLASS_ID = 100, verbose = F)
 }
 \arguments{
-\item{in.GRD}{character string path to SAGA grid file.  The grid should}
+\item{in_grd}{character string path to SAGA grid file.  The grid should}
 
-\item{out.poly}{character string path to output polygon shapefile}
+\item{out_poly}{character string path to output polygon shapefile}
 
-\item{saga.env}{A SAGA geoprocessing object.  Suggested version is 2.2.2.}
+\item{saga_env}{A SAGA geoprocessing object.  Suggested version is 2.2.2.}
 
-\item{CLASS_ID}{numeric raster value that designates which grid cells to convert to polygon (cells with other values will be ignored)}
+\item{CLASS_ID}{numeric raster value that designates which grid cells to
+convert to polygon (cells with other values will be ignored)}
 }
 \description{
-Creates a polygon from a grid ('shapes_grid' module 6: Vectorising Grid Classes)
+Creates a polygon from a grid ('shapes_grid' module 6:
+ Vectorising Grid Classes)
 }

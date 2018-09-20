@@ -9,13 +9,14 @@ ExpandBBox(geom1, tol)
 \arguments{
 \item{geom1}{an R Spatial* object}
 
-\item{tol}{numeric, distance in kilometers to buffer}
+\item{tol}{numeric, distance in kilometers to expand bounding box
+in all directions (xmin' = xmin - tol, xmax' = xmax + tol)}
 }
 \value{
 a bounding box R object
 }
 \description{
-Increases the size of a bounding box by a specified
+Increases the size of a bounding box by a specified distance
 }
 \details{
 This is used with \code{link[rcanvec]{nts.bbox}} in order to get all NTS tiles that

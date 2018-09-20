@@ -4,25 +4,29 @@
 \alias{SnapToPourPoint}
 \title{Snap to pour point}
 \usage{
-SnapToPourPoint(station, in.DEM, saga.env, upstream.threshold = 35000)
+SnapToPourPoint(station, in_DEM, saga_env, upstr_threshold = 35000)
 }
 \arguments{
 \item{station}{spatialpointsdataframe representing a hydrological station}
 
-\item{in.DEM}{character path pointing to hydrologically conditioned DEM. Must be in projected
+\item{in_DEM}{character path pointing to hydrologically conditioned DEM.
+Must be in projected
 coordinate system and, at a minimum, have filled sinks.}
 
-\item{saga.env}{A SAGA geoprocessing object.  Suggested version is 2.2.2.}
+\item{saga_env}{A SAGA geoprocessing object.  Suggested version is 2.2.2.}
 
-\item{upstream.threshold}{integer, number of upstream cells required to initiate channel growth.
-A smaller number will yield more channels and will snap to smaller streams. Larger numbers will produce
-only major channel branches. For a 50k DEM, numbers between 20,000 and 50,000 are appropriate to reproduce the
-main channel network without many small branches.}
+\item{upstr_threshold}{integer, number of upstream cells required to
+initiate channel growth. A smaller number will yield more channels and will
+ snap to smaller streams. Larger numbers will produce only major channel
+  branches. For a 50k DEM, numbers between 20,000 and 50,000 are appropriate
+  to reproduce the main channel network without many small branches.}
 }
 \value{
-a SpatialPointsDataFrame with the same data as the input station, but located on a DEM stream branch.
+a SpatialPointsDataFrame with the same data as the input station,
+but located on a DEM stream branch.
 }
 \description{
-Finds the nearest location on a stream segment to a hydrological station and returns the pourpoint
-as a spatialpointsdataframe with the same attributes as the input station.
+Finds the nearest location on a stream segment to a hydrological
+station and returns the pourpoint as a spatialpointsdataframe with the same
+ attributes as the input station.
 }

@@ -387,10 +387,15 @@ check_symmetry <- function(table){
 #'
 #' @description  Finds all monitoring stations within a target basin
 #'
-#' @param basin
-#' @param stations
-#' @param target_station
-#' @param stationID
+#' @param basin Either a spatialpolygonsdataframe of the target basin, or the
+#' path to a shapefile of the target basin.  If a path is provided, the function
+#' will attempt to use the sf package to hasten the shapefile read
+#' @param stations SpatialPointsDataFrame of all hydrometric stations
+#' @param target_station character, station number corresponding to the basin
+#' that is provided. If provided, prevents the target station from being included
+#' in the results as upstream of itself
+#' @param station_number character, name of column in stations SpatialPointsDataFrame
+#' which corresponds to the station number
 #' @return A character vector of station IDs
 #' @keywords internal
 #' @export
@@ -402,7 +407,9 @@ upstream_stations_from_delineation <- function(basin, stations, target_station,
   #upstream.stations <- raster::intersect(stations, bind(basin,basin)) # doesn't work with just 1.. bug https://goo.gl/zUkwgJ
   upstream.stations <- sp::over(basin, stations, returnList = T)[[1]]
   upstream.stations <- upstream.stations[, station_number]
-  upstream.stations <- upstream.stations[upstream.stations != target_station]
+  if (!missing(target_station)){
+    upstream.stations <- upstream.stations[upstream.stations != target_station]
+  }
   return(upstream.stations)
 }
 
@@ -416,7 +423,7 @@ upstream_stations_from_delineation <- function(basin, stations, target_station,
 #'(n x n+1) data.table with first column named "ID" and all other columns
 #'named according to station number. Row i and column i+1 should correspond to
 #'the same station.
-#' @param polygon_folder
+#' @param polygon_folder character, path to folder containing delineation shapefiles
 #' @param station_pts spatialpointsdataframe of monitoring stations
 #' @param station_number column name identifying the station number
 #' @return A character vector of station IDs

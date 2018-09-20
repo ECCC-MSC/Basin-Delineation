@@ -4,7 +4,8 @@
 \alias{CombineWatersheds}
 \title{Combine Watersheds}
 \usage{
-CombineWatersheds(station, shedspoly_folder, dempoly_folder, out_folder)
+CombineWatersheds(station, shedspoly_folder, dempoly_folder, out_folder,
+  station_point)
 }
 \arguments{
 \item{station}{station number in format "01XY001"}
@@ -16,6 +17,8 @@ drainage basin shapefiles derived from a HydroSHEDS}
 shapefiles derived from DEM}
 
 \item{out_folder}{character, path to folder containing output files}
+
+\item{station_point}{spatialpointsdataframe of station}
 }
 \description{
 Combine DEM-derived and HydroBASINS-derived watershed

@@ -2,10 +2,10 @@
 % Please edit documentation in R/basin_creation.R
 \name{HYBASBasinLimits}
 \alias{HYBASBasinLimits}
-\title{Create containing HydroBASINS}
+\title{Create HydroBASINS delineation}
 \usage{
-HYBASBasinLimits(df, HYBAS, code, outdir, hyb.id = "HYBAS_ID",
-  df.id = "Station")
+HYBASBasinLimits(df, HYBAS, code, outdir, hyb_id = "HYBAS_ID",
+  stn_id = "station_number")
 }
 \arguments{
 \item{df}{data.frame with exactly 1 row containing station names and the
@@ -18,17 +18,23 @@ within cell and on stream}
 
 \item{outdir}{character, directory in which to save output shapefile}
 
-\item{hyb.id}{character, name of column containing ID of HydroBASINS sub-basin
+\item{hyb_id}{character, name of column containing ID of HydroBASINS sub-basin
 that contains the station}
 
-\item{stn.id}{character, name of column containing the station number}
+\item{stn_id}{character, name of column containing the station number}
+}
+\value{
+character, path to created shapefile
 }
 \description{
-Uses a classification code to build the maximum allowable
- drainage basin for a station using HydroBASINS polygons.
+Uses a classification code to build an approximate
+ drainage basin for a hydrometric station using HydroBASINS polygons.
 }
 \details{
-uses the following classification system
+This function uses the following classification system for the
+code parameter, which describes the location of the station relative to
+the containing hydrobasin and the waterbody with which it is associated:
+
 P: containing sub-basin has 2 input sub-basins
   Pcb Waterbody continues upstream and station on main branch below confluence
   Pct Waterbody continues upstream and station on tributary branch above confluence

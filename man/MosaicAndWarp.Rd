@@ -2,16 +2,17 @@
 % Please edit documentation in R/SAGA_Tools.R
 \name{MosaicAndWarp}
 \alias{MosaicAndWarp}
-\title{Mosaic and warp raster}
+\title{Mosaic and warp raster set}
 \usage{
-MosaicAndWarp(gridnames, DEM.path, saga.env,
-  inputCRS = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs",
-  outputCRS = "+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")
+MosaicAndWarp(gridnames, DEM_path, saga_env,
+  input_crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs",
+  output_crs = "+proj=aea +lat_1=50 +lat_2=70 +lat_0=40 +lon_0=-96\\n                  +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")
 }
 \arguments{
-\item{saga.env}{A SAGA geoprocessing object.  Suggested version is 2.2.2.}
+\item{saga_env}{A SAGA geoprocessing object.  Suggested version is 2.2.2.}
 
-\item{outputCRS}{character vector specifying EPSG for coordinate system to output}
+\item{output_crs}{character vector specifying EPSG for coordinate system to
+output}
 }
 \description{
 combines some grids and changes coordinate system

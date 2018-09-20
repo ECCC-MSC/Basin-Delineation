@@ -12,7 +12,8 @@ SnapToNearest(point, lines)
 \item{lines}{spatialLinesDataFrame or spatialLines}
 }
 \value{
-a spatial point with the same data as the input point, but on one of the lines in lines.
+a spatial point with the same data as the input point, but on one of
+the lines in lines.
 }
 \description{
 moves a point to the nearest point on a line

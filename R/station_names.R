@@ -1,6 +1,6 @@
 
 #===============================================================================
-#' @title Waterbody name from HYDAT station name
+#' @title Find waterbody name from HYDAT station name
 #'
 #' @param station_name character string; station name from Hydat station
 #'
@@ -11,7 +11,13 @@
 #' the name of the waterbody on which the station resides.
 #'
 #' @details The returned value can be used to query the canadian geographic
-#'  names database.
+#'  names database to obtain a KML of the feature. The function relies on the
+#'  regularity of the station naming pattern and may give unexpected results in
+#'   certain circumstances such as:
+#'  (*) when the branch of the river is specified
+#'  (*) when there are multiple instances of parenthetical text in the name
+#'  (*) when english and french are both used in the name
+#'  .
 #'
 #' @return a character string of the waterbody name
 #'
@@ -19,6 +25,10 @@
 #' ParseStationName("PEARSON CREEK NEAR PROCTER")
 #' ParseStationName("SCHIAVON CREEK BELOW HIGHEST DIVERSION NEAR THRUMS")
 #' ParseStationName("MADAWASKA (RIVIER) EN AVAL DU BARRAGE TEMISCOUATA")
+#'
+#' # some problem stations
+#' ParseStationName("ROMAINE (RIVIERE) BELOW LAC LAVOIE")
+#' ParseStationName("ARNAUD (PAYNE)(RIVIERE) EN AMONT DE LA RIVIERE HAMELIN-1" )
 #'
 #' @export
 #===============================================================================
@@ -31,6 +41,9 @@ ParseStationName <- function(station_name){
   join_terms_fr_1 <- c("EN AVAL", "EN AMONT", "CENTRALE", "PRES" )
   join_terms_fr_2 <- c("DU", "DE LA", "DE", "DE L'")
   join_terms_fr_3 <- c("AU", "A LA")
+
+  # ensure parenthetical text is preceeded by a blank space
+  gsub("([^ ])\\(", "\\1 (", station_name)
 
   # try to split on english join term
   splitters <- sapply(join_terms_en, pad, pads = " ")

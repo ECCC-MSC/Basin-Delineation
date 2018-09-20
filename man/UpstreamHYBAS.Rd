@@ -7,15 +7,19 @@
 UpstreamHYBAS(station, HYBAS, ignore.endorheic = F, fast = T, outputfile)
 }
 \arguments{
-\item{station}{A SpatialPointsDataFrame corresponding to the station of intrest}
+\item{station}{A SpatialPointsDataFrame corresponding to the station of
+intrest}
 
-\item{ignore.endorheic}{logical, whether or not to include 'virtual connections' in the HydroSHEDS topology}
+\item{ignore.endorheic}{logical, whether or not to include 'virtual
+connections' in the HydroSHEDS topology}
 
-\item{outputfile}{(optional) if provided, saves the upstream hydrobasins to a shapefile. File name must
+\item{outputfile}{(optional) if provided, saves the upstream hydrobasins to
+a shapefile. File name must
 end with '.shp'}
 }
 \value{
-a spatial polygon data frame of the upstream basin in the CRS of the hybas polygon (should be WGS84)
+a spatial polygon data frame of the upstream basin in the CRS of the
+ hybas polygon (should be WGS84)
 }
 \description{
 Return the upstream basin polygon for a station

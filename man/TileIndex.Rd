@@ -4,7 +4,7 @@
 \alias{TileIndex}
 \title{Get names of DEM tiles that overlap object}
 \usage{
-TileIndex(geom1, tileindex, tile.id.field)
+TileIndex(geom1, tileindex, tileid_field)
 }
 \arguments{
 \item{geom1}{An R Spatial* object}
@@ -12,7 +12,7 @@ TileIndex(geom1, tileindex, tile.id.field)
 \item{tileindex}{either an R SpatialPolygonsDataFrame of the DEM tile index, or a character
 path pointing to such a shapefile}
 
-\item{tile.id.field}{Name of column in tileindex that gives DEM sheet number}
+\item{tileid_field}{Name of column in tileindex that gives DEM sheet number}
 }
 \description{
 Find all DEM tiles that intersect a spatial object

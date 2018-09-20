@@ -18,15 +18,20 @@
 #' @export
 #==============================================================================
 LongitudeLength <- function(lat, lat_m, lat_s){
+
   lon_at_eq <- 111.321
+
+  # calculate minutes and seconds if lat is in decimal degrees
   mm <- 0
   ss <- 0
   if (!missing(lat_m)){
     mm <- lat_m / 60
   }
+
   if (!missing(lat_s)){
     ss <- lat_s / 3600
   }
+
   lat_dd <- lat + mm + ss
   lat_rad <- lat_dd * pi / 180
 
@@ -102,31 +107,6 @@ HydroTile <- function(long, lat, fext=""){
 #' HydroMosaic(-115, 52, 50000)
 #' @export
 #==============================================================================
-# HydroMosaic <- function(long, lat, tol, ...){
-#   tol <- tol * 0.001 # convert tolerance to km
-#   LL <- LongitudeLength(lat)
-#   grids <- HydroTile(long, lat, ...)
-#
-#   # check all sides for proximity, add grids if necessary
-#
-#   if ( (lat - floor(lat / 5) * 5) * 111 < tol){
-#     # too close to bottom
-#     grids <- c(grids, HydroTile(long, lat - 5, ...))
-#   }else if ( (ceiling(lat / 5) * 5 - lat) * 111 < tol){
-#     # too close to top
-#     grids <- c(grids, HydroTile(long, lat + 5, ...))
-#   }
-#
-#   if ( (long - floor(long / 5) * 5) * LL < tol){
-#     # too far west
-#     grids <- c(grids, HydroTile(long - 5, lat, ...))
-#   }else if ( (ceiling(long / 5) * 5 - long) * LL < tol){
-#     grids <- c(grids, HydroTile(long + 5, lat, ...))
-#   }
-#
-#   return(grids)
-# }
-
 HydroMosaic <- function(long, lat, tol, ...){
   tol   <- tol * 0.001 # convert tolerance to km
   # convert to degrees
@@ -446,24 +426,29 @@ GraticuleIndices <- function(long, lat, tol, resolution=1){
 #==============================================================================
 #only works with lat/lon
 
-#' @param geom1 geometry with which to cover with NED DEM tiles
+#' @title Find all NED DEM tiles necessary to cover spatial object
 #'
-#' @param tol distance to buffer geometry
+#' @param geom1 Spatial* object for which a covering set of tiles is desired
+#'
+#' @param tol distance to buffer geometry (geom1)
+#'
+#' @description
+#'
 #==============================================================================
 NEDcoverage <- function(geom1, tol){
   if (grepl("units=m", geom1@proj4string@projargs)){
     geom1 <- sp::spTransform(geom1,
            CRSobj = sp::CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
   }
-
-    # for points
+    # Find graticule intersections of the geometry
+    # for points, just take one tile
     if (all(geom1@bbox[, 1] == geom1@bbox[, 2])){
       coords <- rgeos::gCentroid(geom1)@coords[1, ]
       ind <- GraticuleIndices(coords[1], coords[2], tol = tol, resolution = 1)
 
 
       }else{
-      # for non-points
+      # for polygons and lines
       xrange <- c(seq(geom1@bbox[1, 1], geom1@bbox[1, 2], 1), geom1@bbox[1, 2]) # duplicate last to ensure its included
       yrange <- c(seq(geom1@bbox[2, 1], geom1@bbox[2, 2], 1), geom1@bbox[2, 2])
       allpts <- expand.grid(unique(xrange), unique(yrange))
@@ -477,24 +462,6 @@ NEDcoverage <- function(geom1, tol){
   return(as.character(tiles))
 }
 
-#==============================================================================
-#' @title Add missing columns
-#'
-#' @param df A dataframe
-#'
-#' @param columns a character vector of columns that are desired in output
-#' dataframe
-#'
-#' @param return a dataframe containing all columns specified in columns
-#' parameter
-#==============================================================================
-AddMissingColumns <- function(df, columns){
-  missing.cols <- !(columns %in% names(df))
-  to_add <- as.data.frame(matrix(nrow = nrow(df), ncol = sum(missing.cols)))
-  names(to_add) <- columns[missing.cols]
-  df <- cbind(df, to_add)
-  return(df)
-}
 
 #==============================================================================
 #' @title Remove holes from polygon

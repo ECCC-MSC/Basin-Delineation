@@ -4,23 +4,26 @@
 \alias{ChannelNetworkRS}
 \title{Build channel network using RSAGA}
 \usage{
-ChannelNetworkRS(in.DEM, init.grid, out.shape, upstream.threshold = 35000,
-  saga.env, verbose = F)
+ChannelNetworkRS(in_DEM, init.grid, out.shape, upstr_threshold = 35000,
+  saga_env, verbose = F)
 }
 \arguments{
-\item{in.DEM}{character string pointing to the *.sgrd path of a (hydrologically appropriate) DEM}
+\item{in_DEM}{character string pointing to the *.sgrd path of a
+(hydrologically appropriate) DEM}
 
-\item{init.grid}{(optional) character string pointing to a flow accumulation *.sgrd file.  If not
-supplied, it will be created.}
+\item{init.grid}{(optional) character string pointing to a flow accumulation
+*.sgrd file.  If not supplied, it will be created.}
 
-\item{out.shape}{character string naming a shapefile open for writing which will be the channel network}
+\item{out.shape}{character string naming a shapefile open for writing which
+will be the channel network}
 
-\item{upstream.threshold}{integer, number of upstream cells required to initiate channel growth.
-A smaller number will yield more channels and will snap to smaller streams. Larger numbers will produce
-only major channel branches. For a 50k DEM, numbers between 20,000 and 50,000 are appropriate to reproduce the
-main channel network without many small branches.}
+\item{upstr_threshold}{integer, number of upstream cells required to
+initiate channel growth. A smaller number will yield more channels and will
+snap to smaller streams. Larger numbers will produce only major channel
+ branches. For a 50k DEM, numbers between 20,000 and 50,000 are appropriate
+ to reproduce the main channel network without many small branches.}
 
-\item{saga.env}{A SAGA geoprocessing object.  Suggested version is 2.2.2.
+\item{saga_env}{A SAGA geoprocessing object.  Suggested version is 2.2.2.
 character string  Mosaic 'grid_tools' module 3}
 }
 \value{

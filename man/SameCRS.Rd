@@ -7,11 +7,15 @@
 SameCRS(spgeom1, spgeom2)
 }
 \arguments{
-\item{spgeom1}{Spatial* object that will be evaluated and transformed if necessary}
+\item{spgeom1}{Spatial* object that will be evaluated and transformed
+if necessary}
 
-\item{spgeom2}{Spatial* object that will not be transformed}
+\item{spgeom2}{Spatial* object that will not be transformed (reference CRS)}
+}
+\value{
+a Spatial* object with the same CRS as spgeom2
 }
 \description{
-Checks whether or not two objects have the same spatial reference.  If not, one of them
-is transformed to match the other.
+Checks whether or not two objects have the same spatial
+ reference.  If not, one of them is transformed to match the other.
 }

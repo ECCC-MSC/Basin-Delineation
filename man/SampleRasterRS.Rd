@@ -4,19 +4,20 @@
 \alias{SampleRasterRS}
 \title{Measure raster at point using RSAGA}
 \usage{
-SampleRasterRS(point, grid, saga.env, verbose = F)
+SampleRasterRS(point, grid, saga_env, verbose = F)
 }
 \arguments{
-\item{point}{either SpatialPoints* or character path to points used to intersect grid. Must have same CRS as the grid}
+\item{point}{either SpatialPoints* or character path to points used to
+intersect grid. Must have same CRS as the grid}
 
 \item{grid}{grid whose values will be sampled}
 
-\item{saga.env}{A SAGA geoprocessing object.  Suggested version is 2.2.2.}
+\item{saga_env}{A SAGA geoprocessing object.  Suggested version is 2.2.2.}
 }
 \value{
 vector of grid values the same length as the number of points
 }
 \description{
-Spatial Join: Retrieves information from the selected grid at the positions of the points
-and returns the grid values.
+Spatial Join: Retrieves information from the selected grid at
+the positions of the points and returns the grid values.
 }

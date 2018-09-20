@@ -2,7 +2,7 @@
 % Please edit documentation in R/misc.R
 \name{NearestHYBAS}
 \alias{NearestHYBAS}
-\title{#' Hybas to stationprefix}
+\title{Hybas to stationprefix}
 \usage{
 NearestHYBAS(station)
 }

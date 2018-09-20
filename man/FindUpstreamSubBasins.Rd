@@ -7,17 +7,20 @@
 FindUpstreamSubBasins(HYBAS, HYBAS.ID, ignore.endorheic = F)
 }
 \arguments{
-\item{ignore.endorheic}{Whether or not to ignore 'virtual' inputs from inland basins. defaults to FALSE.}
+\item{ignore.endorheic}{Whether or not to ignore 'virtual' inputs from
+inland basins. defaults to FALSE.}
 
 \item{HYBAS:}{a HYBAS spatial polygon object or dataframe from such an object}
 
 \item{HYBAS.ID:}{The HYBAS.ID of the sub-basin from which to go upstream}
 }
 \description{
-For a sub-basin with a given HYBAS.ID, find all sub-basins that are directly upstream (adjacent)
+For a sub-basin with a given HYBAS.ID, find all sub-basins
+that are directly upstream (adjacent)
 uses tables as given from LoadHybas
 }
 \examples{
 HB <- LoadHybas("C:\\\\Data\\\\HydroBASINS", 'ar', 3)
 FindUpstreamSubBasins(HB, "")
+
 }

@@ -2,16 +2,18 @@
 % Please edit documentation in R/SAGA_Tools.R
 \name{FlowAccumulationRS}
 \alias{FlowAccumulationRS}
-\title{Flow Accumulation using RSAGA}
+\title{Generate Flow Accumulation using RSAGA}
 \usage{
-FlowAccumulationRS(in.DEM, out_grid, saga.env, verbose = F)
+FlowAccumulationRS(in_DEM, out_grid, saga_env, verbose = F)
 }
 \arguments{
-\item{in.DEM}{character string pointing to the *.sgrd path of a (hydrologically appropriate) DEM}
+\item{in_DEM}{character string pointing to the *.sgrd path of a
+(hydrologically appropriate) DEM}
 
-\item{saga.env}{A SAGA geoprocessing object.  Suggested version is 2.2.2.}
+\item{saga_env}{A SAGA geoprocessing object.  Suggested version is 2.2.2.}
 
-\item{output_grid}{character string pointing to the *.sgrd path of the output file}
+\item{output_grid}{character string pointing to the *.sgrd path of the
+output file}
 }
 \value{
 path to output flow accumulation grid

@@ -2,15 +2,19 @@
 % Please edit documentation in R/misc.R
 \name{InterpretShapefile}
 \alias{InterpretShapefile}
-\title{Shapefile Helper}
+\title{read shapefile as filepath or R object}
 \usage{
-InterpretShapefile(x)
+InterpretShapefile(x, use_sf = T, quiet = T)
 }
 \arguments{
-\item{x}{either an R spatial object or a character string specifying a shapefile path}
+\item{x}{either an R spatial object or a character string specifying a
+shapefile path}
+
+\item{use_sf}{logical, whether or not to try to use use the 'sf' package
+to read the shapefile quickly.}
 }
 \description{
 allows for shapefiles to be passed as character strings or
-as R spatial objects in other functions
+as R spatial objects in other functions.
 }
 \keyword{internal}

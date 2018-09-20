@@ -4,53 +4,66 @@
 \alias{UpslopeDEM}
 \title{Calculate upslope polygon from DEM}
 \usage{
-UpslopeDEM(point, DEM.path, DEM.source = "NTS", saga.env, outdir,
-  pointbuffer = 50, dem.clip.square = 50000, projected.CRS,
-  iterate.to = 150, iterate.incr = 50, iterate.thres = 0.4,
-  method = "D8", upstream.threshold = 35000, ...)
+UpslopeDEM(point, DEM_path, DEM_source = "NTS", saga_env, outdir,
+  pointbuffer = 50, clip_size = 50000, projected.CRS, iterate_to = 150,
+  iterate_incr = 50, iterate_thres = 0.4, method = "D8",
+  upstr_threshold = 35000, ...)
 }
 \arguments{
-\item{point}{a SpatialPointsDataFrame corresponding to a hydrometric station.  Must be in same coordinates system as DEM and coordinate system
-must be projected (not lat/long).  Must have longitude and latitude attributes.}
+\item{point}{a SpatialPointsDataFrame corresponding to a hydrometric station.
+Must be in same coordinates system as DEM and coordinate system must be
+projected (not lat/long).  Must have longitude and latitude attributes.}
 
-\item{DEM.path}{One of:
-(1) a file path to a directory containing DEM files either in the the format n%%w0%%_con_grid.sgrd (if DEM.source is 'SHEDS')
-or a directory to which DEM tiles will be downloaded (if DEM.source='CDEM', 'CDED' etc.),
-(2) a file path to a dem file in SAGA format.  The DEM should be in a projected coordinate system and the coordinate
-system should match that of the point (e.g. Canada Albers Conformal Conic)}
+\item{DEM_path}{One of:
+ (1) a file path to a directory containing DEM files either in the the format
+ n%%w0%%_con_grid.sgrd (if DEM_source is 'SHEDS') or a directory to which DEM
+ tiles will be downloaded (if DEM_source='CDEM', 'CDED' etc.),
+ (2) a file path to a dem file in SAGA format.  The DEM should be in a
+ projected coordinate system and the coordinatesystem should match that of
+ the point (e.g. Canada Albers Conformal Conic)
 
-\item{DEM.source}{character, one of: c('CDED', 'NED', 'CDEM, CDSM', 'SHEDS'). Ignored if a DEM file is supplied to DEM.path}
+ @param clip_size How big (in m) a clip should be generated from the
+ original DEM (too big doesn't work and is slower)
 
-\item{saga.env}{an rsaga environment object}
+ @param projected.CRS character vector (proj4) specifying "working" CRS in
+ which area and distance calculations are to be done}
+
+\item{DEM_source}{character, one of: c('CDED', 'NED', 'CDEM, CDSM', 'SHEDS').
+Ignored if a DEM file is supplied to DEM_path}
+
+\item{saga_env}{an rsaga environment object}
 
 \item{outdir}{Directory to output final upslope shapefile}
 
-\item{pointbuffer}{numeric, how much should the point be buffered (calculates upslope basin of buffered area)}
+\item{pointbuffer}{numeric, how much should the point be buffered (calculates
+upslope basin of buffered area)}
 
-\item{dem.clip.square}{How big (in m) a clip should be generated from the original DEM (too big doesn't work and is slower)}
+\item{iterate_to}{numeric, if greater than pointbuffer, checks that the
+calculated upslope area is at least 0.5 sq. km larger than the}
 
-\item{projected.CRS}{character vector (proj4) specifying "working" CRS in which area and distance calculations are to be done}
+\item{iterate_incr}{numeric, by how much should the buffer be grown each
+iteration (ignored if iterate_to is equal to pointbuffer)
 
-\item{iterate.to}{numeric, if greater than pointbuffer, checks that the calculated upslope area is at least 0.5 sq. km larger
-than the}
+ @param iterate_thres numeric, how many square kilometers difference between
+ the calculated area and initial point buffer should be required to trigger
+ another iteration (ignored if iterate_to is equal to pointbuffer)}
 
-\item{iterate.incr}{numeric, by how much should the buffer be grown each iteration (ignored if iterate.to is equal to pointbuffer)}
+\item{method}{character, one of ('D8', 'DINF'), specifying the hydrological
+pathing model}
 
-\item{iterate.thres}{numeric, how many square kilometers difference between the calculated area and
-initial point buffer should be required to trigger another iteration (ignored if iterate.to is equal to pointbuffer)}
+\item{upstr_threshold}{integer, number of upstream cells required to
+initiate channel growth. A smaller number will yield more channels and will
+ snap to smaller streams. Larger numbers will produce only major channel
+  branches. For a 50k DEM, numbers between 20,000 and 50,000 are appropriate
+   to reproduce the main channel network without many small branches.
 
-\item{method}{character, one of ('D8', 'DINF'), specifying the hydrological pathing model}
+ @return A list containing diagnostic information and and a character string
+  naming the recently created upstream area polygon}
 
-\item{upstream.threshold}{integer, number of upstream cells required to initiate channel growth.
-A smaller number will yield more channels and will snap to smaller streams. Larger numbers will produce
-only major channel branches. For a 50k DEM, numbers between 20,000 and 50,000 are appropriate to reproduce the
-main channel network without many small branches.}
-
-\item{...}{optional arguments to \link[RSAGA]{rsaga.geoprocessor} including 'verbose' (toggles SAGA console output)}
-}
-\value{
-A list containing diagnostic information and and a character string naming the recently created upstream area polygon
+\item{...}{optional arguments to \link[RSAGA]{rsaga.geoprocessor} including
+'verbose' (toggles SAGA console output)}
 }
 \description{
-Create a drainage basin shapefile using a DEM and a 'pour point'.  The polygon is
+Create a drainage basin shapefile using a DEM and a 'pour point'.
+ The polygon is
 }

@@ -4,23 +4,27 @@
 \alias{FindDownstreamBasins}
 \title{Find Downstream Basins}
 \usage{
-FindDownstreamBasins(HYBAS.ID, HYBAS, max.pass = -1, ignore.endo = T)
+FindDownstreamBasins(HYBAS, HYBAS.ID, n_iter = -1, ignore.endo = T)
 }
 \arguments{
-\item{HYBAS.ID}{character vector of one or more HydroBASINS ID's}
-
 \item{HYBAS}{a HYBAS spatial polygon object or dataframe from such an object}
 
-\item{max.pass}{integer, how many iterations to perform. To remove limit, set to -1 (default)}
+\item{HYBAS.ID}{character vector of one or more HydroBASINS ID's}
 
-\item{ignore.endo}{logical, whether or not to include 'virtual' connections from endorheic sinks
-(see HydroBASINS technical documentation for more details)}
+\item{n_iter}{integer, how many iterations to perform. To remove limit,
+set to -1 (default)}
+
+\item{ignore.endo}{logical, whether or not to include 'virtual' connections
+from endorheic sinks (see HydroBASINS technical documentation for more details)}
 }
 \value{
-a character vector of HydroBASIN ID's corresponding to downstream basins
+a character vector of HydroBASIN ID's corresponding to downstream
+basins
 }
 \description{
-Uses the HydroBasins "NEXT_DOWN" field to identify all downstream polygons from a target polygon.
-It is possible to stop downstream navigation at endorheic sinks (terminal polygons within inland basins), or to continue
-through 'virtual' connections (see HydroBASINS technical documentation for more details).
+Uses the HydroBasins "NEXT_DOWN" field to identify all downstream
+polygons from a target polygon. It is possible to stop downstream navigation
+at endorheic sinks (terminal polygons within inland basins), or to continue
+through 'virtual' connections (see HydroBASINS technical documentation for
+ more details).
 }

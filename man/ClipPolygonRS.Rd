@@ -2,20 +2,18 @@
 % Please edit documentation in R/SAGA_Tools.R
 \name{ClipPolygonRS}
 \alias{ClipPolygonRS}
-\title{Clip Polygon   # Clip Grids = 11}
+\title{Clip Polygon   (Clip Grids = 11)}
 \usage{
-ClipPolygonRS(input, clipping.layer, output, saga.env, verbose = F)
+ClipPolygonRS(input, clipping.layer, output, saga_env, verbose = F)
 }
 \arguments{
 \item{input}{SpatialPointsDataFrame}
 
 \item{clipping.layer}{character path to tiled grid to clip}
 
-\item{output}{(optional) path to save output DEM, otherwise appends '_clipped' to filename of in.DEM}
+\item{output}{(optional) path to save output DEM, otherwise appends '_clipped'
+to filename of in_DEM}
 
-\item{saga.env}{A SAGA geoprocessing object.  Suggested version is 2.2.2.}
-}
-\description{
-Clip Polygon   # Clip Grids = 11
+\item{saga_env}{A SAGA geoprocessing object.  Suggested version is 2.2.2.}
 }
 \keyword{internal}

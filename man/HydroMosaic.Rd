@@ -7,13 +7,20 @@
 HydroMosaic(long, lat, tol, ...)
 }
 \arguments{
+\item{long}{longitude in decimal degrees}
+
+\item{lat}{latitude in decimal degrees}
+
 \item{tol}{Tolerance in m to consider}
 }
 \value{
 A vector of grid names to load
 }
 \description{
-Finds all HydroSHEDS DEM tiles within a specified tolerance of a point.  To be used
-with 3 arc-second hydrologically conditioned DEM.
+Finds all HydroSHEDS DEM tiles within a specified tolerance of
+a point.  To be used with 3 arc-second hydrologically conditioned DEM.
+}
+\examples{
+HydroMosaic(-115, 52, 50000)
 }
 \keyword{internal}

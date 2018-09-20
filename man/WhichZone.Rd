@@ -2,7 +2,7 @@
 % Please edit documentation in R/misc.R
 \name{WhichZone}
 \alias{WhichZone}
-\title{Calculate UTM zone from longitude}
+\title{Determine UTM zone from longitude}
 \usage{
 WhichZone(long)
 }
@@ -17,4 +17,8 @@ Determines UTM zone from longitude
 }
 \details{
 (floor((long + 180)/6) %% 60) + 1
+}
+\examples{
+WhichZone(-125.7)
+
 }

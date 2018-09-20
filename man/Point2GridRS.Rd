@@ -4,17 +4,19 @@
 \alias{Point2GridRS}
 \title{Shapes to Grid}
 \usage{
-Point2GridRS(point, grid.sys, out.name, saga.env, buffer.dist = 150,
+Point2GridRS(point, grid.sys, out_name, saga_env, buffer_dist = 150,
   verbose = F)
 }
 \arguments{
-\item{point}{A SpatialPoint or SpatialPointsDataFrame corresponding to a station}
+\item{point}{A SpatialPoint or SpatialPointsDataFrame corresponding to a
+station}
 
-\item{grid.sys}{A SAGA *.sgrd file with the same grid system as the desired output}
+\item{grid.sys}{A SAGA *.sgrd file with the same grid system as the desired
+output}
 
-\item{out.name}{Character string of output file name}
+\item{out_name}{Character string of output file name}
 
-\item{buffer.dist}{If equal to zero does not buffer.}
+\item{buffer_dist}{If equal to zero does not buffer.}
 
 \item{env}{A SAGA geoprocessing object.  Suggested version is 2.2.2.}
 }

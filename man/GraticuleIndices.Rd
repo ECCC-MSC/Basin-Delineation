@@ -2,10 +2,24 @@
 % Please edit documentation in R/misc.R
 \name{GraticuleIndices}
 \alias{GraticuleIndices}
-\title{Find degree-graticule tiles within distance}
+\title{Find intersecting graticule tiles within distance of point}
 \usage{
-GraticuleIndices(long, lat, tol, resolution = 1, ...)
+GraticuleIndices(long, lat, tol, resolution = 1)
 }
-\description{
-Find degree-graticule tiles within distance
+\arguments{
+\item{long}{target longitude}
+
+\item{lat}{target latitude}
+
+\item{tol}{distance (in metres) to search. Search area is a square.}
+
+\item{resolution}{numeric value indicating the width and height of
+graticule cells. For example a resolution of 1 corresponds to 1x1 degree tiles
+and a resolution of 5 corresponds to 5x5 degree tiles}
+}
+\value{
+a dataframe whose rows correspond to graticule index coordinates
+}
+\details{
+The graticules are reported based on their upperleftmost corner
 }

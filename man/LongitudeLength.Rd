@@ -4,18 +4,23 @@
 \alias{LongitudeLength}
 \title{Calculate Length of Longitudinal Degree}
 \usage{
-LongitudeLength(lat, lat.m, lat.s)
+LongitudeLength(lat, lat_m, lat_s)
 }
 \arguments{
 \item{lat}{numeric vector - northing of location (degrees or decimal degrees)}
 
-\item{lat.m}{(optional) numeric vector - northing of location, minutes (if lat is not specified in decimal degrees)}
+\item{lat_m}{(optional) numeric vector - northing of location, minutes (if lat is not specified in decimal degrees)}
 
-\item{lat.s}{(optional) numeric vector - northing of location, seconds (if lat is not specified in decimal degrees)}
+\item{lat_s}{(optional) numeric vector - northing of location, seconds (if lat is not specified in decimal degrees)}
 }
 \value{
 numeric vector of lengths  (measured in kilometres)
 }
 \description{
 Calculates the length of one degree of longitude at a given latitude
+}
+\examples{
+LongitudeLength(61.4)
+LongitudeLength(34,2,24)
+
 }

@@ -7,20 +7,24 @@
 LoadHybas(path, area = "na", level = 7)
 }
 \arguments{
-\item{area}{which region to load. can be 'na' (north america), or 'ar' (arctic)}
+\item{area}{which region to load. can be 'na' (north america), or 'ar'
+(arctic)}
 
 \item{level}{The desired Pfaffstetter level}
 
-\item{directory}{the directory containing HydroBASIN shapefiles.  Searches recursively.}
+\item{directory}{the directory containing HydroBASIN shapefiles.
+Searches recursively.}
 }
 \value{
 A list containing a spatial object and an attribute table
 }
 \description{
-For a directory containing HydroBASIN shapefiles (or for a specified ), load the file
-   associated with the specified Pfaffstetter level and return an attribute table.
-   NOTE: If a directory is provided, file naming convention must match original HYBAS (e.g. hybas_na_lev02_v1c.shp)
+For a directory containing HydroBASIN shapefiles , load the file
+associated with the specified Pfaffstetter level and return an attribute table.
+NOTE: If a directory is provided, file naming convention must match original
+HYBAS (e.g. hybas_na_lev02_v1c.shp)
 }
 \examples{
- LoadHybas("C:\\\\Data\\\\HydroBASINS", 'ar', 3)
+ LoadHybas("~/HydroBASINS", 'ar', 3)
+
 }

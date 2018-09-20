@@ -4,20 +4,23 @@
 \alias{FillSinksRS}
 \title{Fill Sinks}
 \usage{
-FillSinksRS(in.DEM, out.DEM, saga.env, MINSLOPE = 0.01, verbose = F,
+FillSinksRS(in_DEM, out_DEM, saga_env, MINSLOPE = 0.01, verbose = F,
   XXL = F)
 }
 \arguments{
-\item{in.DEM}{character path to grid to fill}
+\item{in_DEM}{character path to grid to fill}
 
-\item{out.DEM}{(optional) path to save output DEM, otherwise appends '_filled' to filename of in.DEM}
+\item{out_DEM}{(optional) path to save output DEM, otherwise appends
+'_filled' to filename of in_DEM}
 
-\item{saga.env}{A SAGA geoprocessing object.  Suggested version is 2.2.2.}
+\item{saga_env}{A SAGA geoprocessing object.  Suggested version is 2.2.2.}
 
 \item{MINSLOPE}{minimum slope to maintain between cells}
 
-\item{XXL}{logical, whether or not to use the 'Fill sinks XXL' tool, suitable for large grids}
+\item{XXL}{logical, whether or not to use the 'Fill sinks XXL' tool, suitable
+for large grids}
 }
 \description{
-Fill sinks according to Wang and Liu ('ta_preprocessor' module 4 or 5 for XXL)
+Fill sinks according to Wang and Liu ('ta_preprocessor' module
+4 or 5 for XXL)
 }

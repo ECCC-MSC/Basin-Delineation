@@ -2,7 +2,7 @@
 % Please edit documentation in R/misc.R
 \name{HydroTile}
 \alias{HydroTile}
-\title{Get index of HydroSHEDS DEM tile}
+\title{Get name of HydroSHEDS DEM tile}
 \usage{
 HydroTile(long, lat, fext = "")
 }
@@ -11,9 +11,14 @@ HydroTile(long, lat, fext = "")
 
 \item{lat}{numeric latitude}
 
-\item{fext}{file extension for output filename (needs leading '.')}
+\item{fext}{file extension for output filename}
 }
 \description{
-returns the name of a HYDROSHEDS tiled data file name based on the coordinates of a point
+returns the name of a HYDROSHEDS tiled data file name based on
+the coordinates of a point
+}
+\examples{
+HydroTile(-126.4, 56)
+
 }
 \keyword{internal}

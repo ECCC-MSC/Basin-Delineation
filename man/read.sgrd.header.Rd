@@ -2,7 +2,7 @@
 % Please edit documentation in R/misc.R
 \name{read.sgrd.header}
 \alias{read.sgrd.header}
-\title{Read SAGA Grid header}
+\title{Read SAGA SGRD header}
 \usage{
 read.sgrd.header(file)
 }

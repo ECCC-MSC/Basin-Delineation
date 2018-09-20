@@ -15,8 +15,9 @@ FindNearestRiverSegment(spatialPoint, riverLines, HYBAS)
 dataframe of nearest lines (attribute table of matches)
 }
 \description{
-Find the nearest line segment (river) to a point (station).  Spatial objects should be in an
-appropriate coordinate system (i.e. not lat-long) otherwise they will be projected and this adds to processing time.
-If CRS does not match between the stations and the rivers they will both be projected into Canada Albers Equal
-Area conic.
+Find the nearest line segment (river) to a point (station).
+Spatial objects should be in an appropriate coordinate system (i.e. not
+lat-long) otherwise they will be projected and this adds to processing time.
+If CRS does not match between the stations and the rivers they will both be
+projected into Canada Albers Equal Area conic.
 }
