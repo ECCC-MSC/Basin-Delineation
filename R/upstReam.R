@@ -471,7 +471,8 @@ populate_table_from_delineations <- function(table, polygon_folder,
 #'
 #' @details to return only stations within a particular drainage area (e.g.
 #' stations beginning with '02'), use pattern='^xx' where xx is the drainage
-#' basin number.  So "^01" would return stations from
+#' basin number.  So "^01" would return stations from NS & NB and "^08" would
+#' return stations from BC
 #'
 #===============================================================================
 subset_table <- function(table, pattern, stn_list){

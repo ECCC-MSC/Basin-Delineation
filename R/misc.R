@@ -330,7 +330,7 @@ SameCRS <- function(spgeom1, spgeom2){
 InterpretShapefile <- function(x, use_sf=T, quiet=T){
   if (class(x) == "character"){
 
-    if (require(sf)){
+    if (require(sf) & use_sf){
       x <- sf::st_read(x, quiet=quiet)
       x <- sf::st_zm(x)  # drop Z and M dimensions
       x <- as(x, "Spatial")
@@ -351,11 +351,12 @@ InterpretShapefile <- function(x, use_sf=T, quiet=T){
 #==============================================================================
 #' Expand Bounding box
 #'
-#' @description Increases the size of a bounding box by a specified
+#' @description Increases the size of a bounding box by a specified distance
 #'
 #' @param geom1 an R Spatial* object
 #'
-#' @param tol numeric, distance in kilometers to buffer
+#' @param tol numeric, distance in kilometers to expand bounding box
+#' in all directions (xmin' = xmin - tol, xmax' = xmax + tol)
 #'
 #' @return a bounding box R object
 #'

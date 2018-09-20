@@ -13,7 +13,7 @@
 CDEDGetTilePath <- function(NTS){
   NTS <- tolower(NTS)
   resolution <- switch(as.character(nchar(NTS)), "6" = "50k_dem", "4" = "250k_dem")
-  basepath <- "http://ftp.geogratis.gc.ca/pub/nrcan_rncan/archive/elevation/geobase_cded_dnec"  ###  these files don't tile properly at 250k
+  basepath <- "http://ftp.geogratis.gc.ca/pub/nrcan_rncan/archive/elevation/geobase_cded_dnec"  ###  these files don't always tile properly at 250k
 
   ftp_path <- paste(basepath, resolution, substr(NTS, 1, 3), NTS, sep = "/")
   ftp_path <- paste0(ftp_path, ".zip")
@@ -62,11 +62,13 @@ GetNTSDEMTilePath <- function(NTS, product="CDED"){
   NTS <- tolower(NTS)
   resolution <- switch(as.character(nchar(NTS)), "6" = "50k_dem", "4" = "250k_dem")
 
+  # base URL for each data product
   basepath <- switch(product,
         "CDED" = "http://ftp.geogratis.gc.ca/pub/nrcan_rncan/archive/elevation/geobase_cded_dnec", #  these files don't tile properly at 250k
         "CDEM" = "http://ftp.geogratis.gc.ca/pub/nrcan_rncan/elevation/cdem_mnec",
         "CDSM" = "http://ftp.geogratis.gc.ca/pub/nrcan_rncan/elevation/cdsm_mnsc")
 
+  # construct ftp path depending on which data product is to be used
   ftp_path <- switch(product,
             "CDED" = paste(basepath, resolution, substr(NTS, 1, 3), NTS, sep = "/"),
             "CDEM" = paste(basepath, substr(NTS, 1, 3),
@@ -111,6 +113,7 @@ GetNTSDEMTilePath <- function(NTS, product="CDED"){
 DownloadSingleDEM <-  function(DEM_id, DEM_dir, replace=F, product="CDED"){
   output <- T
 
+  # construct ftp path to be queried
   ftp_path <- switch(product,
                      "CDED"  = GetNTSDEMTilePath(DEM_id, product = "CDED"),
                      "CDEM"  = GetNTSDEMTilePath(DEM_id, product = "CDEM"),
@@ -118,6 +121,7 @@ DownloadSingleDEM <-  function(DEM_id, DEM_dir, replace=F, product="CDED"){
                      "NED"   = USGSTileURL(name = DEM_id),
                      "ADEM"  = ARCTICTileURL(name = DEM_id))
 
+  # create appropriate file name / directory structure based on ftp path
   file_paths <- rev(rev(strsplit(ftp_path, "/")[[1]])[1:3])
 
   dir.create(file.path(DEM_dir, paste(file_paths[1:2], collapse = "/")),
@@ -131,13 +135,14 @@ DownloadSingleDEM <-  function(DEM_id, DEM_dir, replace=F, product="CDED"){
     dest_dir <- gsub("\\.zip", "", destfile)
   }
 
-
+  # Check to see if file already exists
   if (!replace & dir.exists(dest_dir)){
     cat(sprintf("%s exists locally and was not downloaded\n\n", DEM_id))
   }else{
     output <- DownloadAndUnzip(url = ftp_path, destfile = destfile, exdir = dest_dir)
   }
 
+  # If an appropriate file was downloaded, return the corresponding file paths
   if (output){
     pattern <- switch(product,
                       "CDED" = "dem[ew_].*(\\<tif\\>|\\<dem\\>)$",
@@ -231,6 +236,7 @@ DownloadAndUnzip <- function(url, destfile, exdir, rmzip=T){
 #==============================================================================
 DownloadMultipleDEM <- function(DEM, DEM_dir, force50k=F, product="CDED"){
 
+  # sanity check - make sure NTS names are well-formed
   if (toupper(product) %in% c("CDED", "CDEM", "CDSM") &
         !all(grepl("^\\d{3}[[:alpha:]](\\d{2})?$", DEM))){
       stop("Bad format for one or more NTS strings")
@@ -241,6 +247,7 @@ DownloadMultipleDEM <- function(DEM, DEM_dir, force50k=F, product="CDED"){
         paste0(x, sprintf("%02d", seq(1, 16)))))
     }
 
+  # download each DEM file using the apply function
     files <- t(sapply(DEM, DownloadSingleDEM, DEM_dir = DEM_dir,
                       replace = F, product = product))
 
@@ -302,7 +309,7 @@ CompileDEM <- function(DEM, DEM_dir, output_dir, force50k = F, product = "CDED")
 #'
 #' @description Covers a shape with a DEM grid
 #'
-#' @param geom1 An R Spatial* object to be 'buffered' with the DEM
+#' @param geom1 An R Spatial* object to be covered with the DEM
 #'
 #' @param tileindex spatialpointspolygon of DEM tile indices or path to
 #'  shapefile of tile index
@@ -313,7 +320,8 @@ CompileDEM <- function(DEM, DEM_dir, output_dir, force50k = F, product = "CDED")
 #'
 #' @param tileid_field Name of column in tileindex that gives DEM sheet number
 #'
-#' @param tol (optional) by how many metres to buffer geom1
+#' @param tol (optional) how wide should geom1 be buffered (metres) before
+#' determining how big the DEM needs to be to cover it
 #'
 #' @param ... optional arguments passed to \link{CompileDEM}
 #'
@@ -401,7 +409,8 @@ USGSTileURL <- function(lon, lat, name, test=TRUE){
 #==============================================================================
 #' @title USGS Tile name from coordinates
 #'
-#' @description Returns the base file name of a USGS NED elevation tile
+#' @description Returns the base file name of a USGS NED elevation tile that
+#' covers a set of coordinates
 #'
 #' @param lon longitude in degrees as an integer
 #'
@@ -424,7 +433,7 @@ USGSTileName <- function(lon, lat, fext="", v="2013"){
 
 
 #==============================================================================
-#' @title USGS Tile name from coordinates
+#' @title ARCTIC DEM Tile name from coordinates
 #'
 #' @description Returns the base file name of an ARCTIC DEM elevation tile
 #'

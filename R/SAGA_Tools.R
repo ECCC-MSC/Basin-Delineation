@@ -405,6 +405,8 @@ MoisaicRS <- function(grids, out_grid, saga_env, xmin, xmax, ymin, ymax,
 #' saves to same directory as input.  Note that the file name must have the
 #' "sdat" file extension (not sgrid)
 #'
+#' @param s_srs source coordinate system.  Defaults to EPSG:4326 (WGS 84)
+#'
 #' @param output_crs character string specifying the coordinate system of the
 #' output grid.  Examples include: "+proj=aea +lat_1=50 +lat_2=70 +lat_0=40
 #' +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80 +datum=NAD83 +units=m +no_defs"

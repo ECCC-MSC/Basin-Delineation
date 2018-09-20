@@ -1,9 +1,9 @@
 
 #===============================================================================
-#' @title Create containing HydroBASINS
+#' @title Create HydroBASINS delineation
 #'
-#' @description Uses a classification code to build the maximum allowable
-#'  drainage basin for a station using HydroBASINS polygons.
+#' @description Uses a classification code to build an approximate
+#'  drainage basin for a hydrometric station using HydroBASINS polygons.
 #'
 #' @param df data.frame with exactly 1 row containing station names and the
 #'  HYBAS_ID of the HydroBASINS polygon that contains each station.
@@ -20,7 +20,10 @@
 #'
 #' @param stn_id character, name of column containing the station number
 #'
-#' @details uses the following classification system
+#' @details This function uses the following classification system for the
+#' code parameter, which describes the location of the station relative to
+#' the containing hydrobasin and the waterbody with which it is associated:
+#'
 #' P: containing sub-basin has 2 input sub-basins
 #'   Pcb Waterbody continues upstream and station on main branch below confluence
 #'   Pct Waterbody continues upstream and station on tributary branch above confluence
@@ -34,6 +37,9 @@
 #' T: containing sub-basin has 0 input sub-basins
 #'
 #' The output shapefile contains the containing hydrobasin.
+#'
+#' @return character, path to created shapefile
+#'
 #' @export
 #===============================================================================
 HYBASBasinLimits <- function(df, HYBAS, code, outdir,
@@ -78,148 +84,22 @@ HYBASBasinLimits <- function(df, HYBAS, code, outdir,
   outfile <- file.path(outdir, outname)
   writeOGR(obj = out, dsn = outfile, layer = gsub("\\.shp", "", outname),
            driver = "ESRI Shapefile", overwrite_layer = T)
+
+  return(outfile)
 }
 
-#===============================================================================
-#' @title Combine Watersheds
-#'
-#' @description Combine DEM-derived and HydroBASINS-derived watershed
-#'
-#' @param station station number in format "01XY001"
-#'
-#' @param shedspoly_folder character, path to folder containing maximum
-#'  drainage basin shapefiles derived from a HydroSHEDS
-#'
-#' @param dempoly_folder character, path to folder containing drainage basin
-#' shapefiles derived from DEM
-#'
-#' @param out_folder character, path to folder containing output files
-#'
-#' @param station_point spatialpointsdataframe of station
-#'
-#' @export
-#===============================================================================
-CombineWatersheds <- function(station, shedspoly_folder, dempoly_folder,
-                              out_folder, station_point){
-  if (!class(station) == "character"){stop("station should be a character string")}
-
-  # find hydrobasins polygon in folder
-  HYB_shp <- list.files(shedspoly_folder,
-                        pattern = paste0(station, ".*\\.shp$"), full.names = T)
-  if (length(HYB_shp) > 1){warning("Multiple hydrobasins polygons found.
-                                    Using the first one.")}
-
-  # load and project hydrobasins polygon
-  HYB <- rgdal::readOGR(HYB_shp[1])
-  HYB <- sp::spTransform(HYB, sp::CRS("+proj=aea +lat_1=50 +lat_2=70 +lat_0=40
-                                       +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80
-                                       +datum=NAD83 +units=m +no_defs"))
-  # find DEM polygon in folder
-  DEM_shp <- list.files(dempoly_folder, pattern = paste0(station, ".*\\.shp$"),
-                        full.names = T)
-
-  if (length(DEM_shp) == 0){
-    file_out <- file.path(out_folder, paste0(station, "_cntrb_basin_HYBonly.shp"))
-    output <- rgeos::gUnaryUnion(HYB[-which.max(HYB$UP_AREA), ])
-    output <- sp::SpatialPolygonsDataFrame(output,
-                               data = data.frame(station_number = station,
-                                               pointbuffer      = NA,
-                                               nodata           = NA,
-                                               snap_dist        = NA,
-                                               DEM              = "None",
-                                               cell_acc         = NA,
-                                               method           = "HYB Only",
-                                               area             = area(output)))
-
-    warnings(sprintf("station %s has no DEM data.  HYBAS data used", station))
-
-  }else{
-    if (length(DEM_shp) > 1){warnings("Multiple DEM polygons found. Using the
-                                  first one.")}
-
-    DEM <- rgdal::readOGR(DEM_shp[1])
-    DEM_data_csv <- list.files(dempoly_folder, pattern = paste0(station, ".*\\.csv$"),
-                               full.names = T)
-    DEM_data <- read.csv(DEM_data_csv)
-
-    # reproject DEM polygon
-    DEM <- sp::spTransform(DEM, CRSobj = sp::CRS(HYB@proj4string@projargs))
-
-    # clean shapes
-    DEM <- zeroBuffer(DEM)
-    HYB <- zeroBuffer(HYB)
-
-    # Perform set operations
-    A <- HYB[-which.max(HYB$UP_AREA), ] # all but most downstream
-    C <- HYB[which.max(HYB$UP_AREA), ]  # most downstream
-
-    # remove gaps
-    if (!missing(station_point)){
-      DEM <- fill_upstream_gaps(station = station_point, basin = DEM,
-                                hybas = C)
-    }
-
-    # Buffer 1mm to clean up any weird slices
-    DEM <- rgeos::gBuffer(DEM, width = 1e-3)
-
-    # clip DEM basin to hydrobasin boudary
-    output <- rgeos::gIntersection(DEM, HYB)
-
-    if (nrow(A) != 0){output <- rgeos::gUnion(output, A)}
-
-    # remove holes (inner rings) prior to disaggregation
-    output <- outerRing(output)
-
-    # remove 'floating' polygons
-    output <- sp::disaggregate(output)
-    output <- output[which.max(lapply(output@polygons, slot, name = "area")), ]
-
-
-    #  remove gaps in most downstream HYBAS
-    # if (nrow(A) == 0 & !missing(station_point)){
-    #   DEM <- fill_upstream_gaps(station = station_point, basin = output,
-    #                                hybas = C)
-    #
-    # }else if (nrow(A) != 0 & !missing(station_point)){
-    #   output <- fill_upstream_gaps(station = station_point, basin = output,
-    #                                hybas = HYB, additive = F)
-    #
-    # }
-
-    # add in data to attributes table
-    snap <- ifelse('snap_dist' %in% names(DEM_data), 'snap_dist', 'snap.dist')
-    data <- DEM_data[, c("station_number", "pointbuffer", "nodata", snap,
-                        "DEM", "cell_acc", "method")]
-    data$area <- round(raster::area(output) * 1e-6, 2)
-    rownames(data) <- sapply(output@polygons, slot, name = "ID")
-    output <- sp::SpatialPolygonsDataFrame(output, data)
-
-    output <- sp::spTransform(output,
-              CRSobj = CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
-
-    file_out <- file.path(out_folder, paste0(station, "_cntrb_basin.shp"))
-  }
-
-  # write output
-  rgdal::writeOGR(obj = output,
-           dsn = file_out,
-           layer = basename(file_out),
-           driver = "ESRI Shapefile")
-
-  write.csv(output@data, sub("shp$", "csv", file_out), row.names = F, quote = F)
-
-  print("done")
-  }
 
 #===============================================================================
-#' @title Calculate basin area using a DEM
+#' @title Calculate basin delineation using a DEM
 #'
-#' @description Create a drainage basin shapefile using a DEM and a
+#' @description Create a drainage basin shapefile using a DEM
+#'
 #' @param point a SpatialPointsDataFrame corresponding to a hydrometric station.
 #'  Must be in same coordinates system as DEM and coordinate system
-#' must be projected (not lat/long).  Must have longitude and latitude attributes.
+#' must be projected (not lat/long).  Must have 'longitude' and 'latitude'
+#' columns in the data frame.
 #'
-#' @param saga_env an rsaga.environment object
+#' @param saga_env A SAGA geoprocessing object.  Suggested version is 2.2.2.
 #'
 #' @param outdir Directory to output final upslope shapefile
 #'
@@ -253,6 +133,10 @@ CombineWatersheds <- function(station, shedspoly_folder, dempoly_folder,
 #'  to reproduce the main channel network without many small branches. Numbers
 #'  around 8,000 will produce most small branches, but tend to create many offshots
 #'  in wide river sections.
+#'
+#'  @prelim_basin (optional) if provided, uses an approximate basin outline
+#'  (e.g. such as one derived from HydroBASINS) to determine the requisite
+#'  size of DEM to clip out and process
 #'
 #' @return A list containing diagnostic information and and a character string
 #' naming the recently created upstream area polygon
@@ -394,6 +278,138 @@ DEMDrainageBasin <- function(point, DEM_path, DEM_source="NTS", saga_env,
   write.csv(meta, gsub("shp", "csv", final_name), row.names = F, quote = F)
 }
 
+
+#===============================================================================
+#' @title Combine Watersheds
+#'
+#' @description Combine DEM-derived and HydroBASINS-derived watershed
+#'
+#' @param station station number in format "01XY001"
+#'
+#' @param shedspoly_folder character, path to folder containing maximum
+#'  drainage basin shapefiles derived from a HydroSHEDS
+#'
+#' @param dempoly_folder character, path to folder containing drainage basin
+#' shapefiles derived from DEM
+#'
+#' @param out_folder character, path to folder containing output files
+#'
+#' @param station_point spatialpointsdataframe of station
+#'
+#' @export
+#===============================================================================
+CombineWatersheds <- function(station, shedspoly_folder, dempoly_folder,
+                              out_folder, station_point){
+  if (!class(station) == "character"){stop("station should be a character string")}
+
+  # find hydrobasins polygon in folder
+  HYB_shp <- list.files(shedspoly_folder,
+                        pattern = paste0(station, ".*\\.shp$"), full.names = T)
+  if (length(HYB_shp) > 1){warning("Multiple hydrobasins polygons found.
+                                   Using the first one.")}
+
+  # load and project hydrobasins polygon
+  HYB <- rgdal::readOGR(HYB_shp[1])
+  HYB <- sp::spTransform(HYB, sp::CRS("+proj=aea +lat_1=50 +lat_2=70 +lat_0=40
+                                      +lon_0=-96 +x_0=0 +y_0=0 +ellps=GRS80
+                                      +datum=NAD83 +units=m +no_defs"))
+  # find DEM polygon in folder
+  DEM_shp <- list.files(dempoly_folder, pattern = paste0(station, ".*\\.shp$"),
+                        full.names = T)
+
+  if (length(DEM_shp) == 0){
+    file_out <- file.path(out_folder, paste0(station, "_cntrb_basin_HYBonly.shp"))
+    output <- rgeos::gUnaryUnion(HYB[-which.max(HYB$UP_AREA), ])
+    output <- sp::SpatialPolygonsDataFrame(output,
+                                           data = data.frame(station_number = station,
+                                                             pointbuffer      = NA,
+                                                             nodata           = NA,
+                                                             snap_dist        = NA,
+                                                             DEM              = "None",
+                                                             cell_acc         = NA,
+                                                             method           = "HYB Only",
+                                                             area             = area(output)))
+
+    warnings(sprintf("station %s has no DEM data.  HYBAS data used", station))
+
+  }else{
+    if (length(DEM_shp) > 1){warnings("Multiple DEM polygons found. Using the
+                                      first one.")}
+
+    DEM <- rgdal::readOGR(DEM_shp[1])
+    DEM_data_csv <- list.files(dempoly_folder, pattern = paste0(station, ".*\\.csv$"),
+                               full.names = T)
+    DEM_data <- read.csv(DEM_data_csv)
+
+    # reproject DEM polygon
+    DEM <- sp::spTransform(DEM, CRSobj = sp::CRS(HYB@proj4string@projargs))
+
+    # clean shapes
+    DEM <- zeroBuffer(DEM)
+    HYB <- zeroBuffer(HYB)
+
+    # Perform set operations
+    A <- HYB[-which.max(HYB$UP_AREA), ] # all but most downstream
+    C <- HYB[which.max(HYB$UP_AREA), ]  # most downstream
+
+    # remove gaps
+    if (!missing(station_point)){
+      DEM <- fill_upstream_gaps(station = station_point, basin = DEM,
+                                hybas = C)
+    }
+
+    # Buffer 1mm to clean up any weird slices
+    DEM <- rgeos::gBuffer(DEM, width = 1e-3)
+
+    # clip DEM basin to hydrobasin boudary
+    output <- rgeos::gIntersection(DEM, HYB)
+
+    if (nrow(A) != 0){output <- rgeos::gUnion(output, A)}
+
+    # remove holes (inner rings) prior to disaggregation
+    output <- outerRing(output)
+
+    # remove 'floating' polygons
+    output <- sp::disaggregate(output)
+    output <- output[which.max(lapply(output@polygons, slot, name = "area")), ]
+
+
+    #  remove gaps in most downstream HYBAS
+    # if (nrow(A) == 0 & !missing(station_point)){
+    #   DEM <- fill_upstream_gaps(station = station_point, basin = output,
+    #                                hybas = C)
+    #
+    # }else if (nrow(A) != 0 & !missing(station_point)){
+    #   output <- fill_upstream_gaps(station = station_point, basin = output,
+    #                                hybas = HYB, additive = F)
+    #
+    # }
+
+    # add in data to attributes table
+    snap <- ifelse('snap_dist' %in% names(DEM_data), 'snap_dist', 'snap.dist')
+    data <- DEM_data[, c("station_number", "pointbuffer", "nodata", snap,
+                         "DEM", "cell_acc", "method")]
+    data$area <- round(raster::area(output) * 1e-6, 2)
+    rownames(data) <- sapply(output@polygons, slot, name = "ID")
+    output <- sp::SpatialPolygonsDataFrame(output, data)
+
+    output <- sp::spTransform(output,
+                              CRSobj = CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
+
+    file_out <- file.path(out_folder, paste0(station, "_cntrb_basin.shp"))
+    }
+
+  # write output
+  rgdal::writeOGR(obj = output,
+                  dsn = file_out,
+                  layer = basename(file_out),
+                  driver = "ESRI Shapefile")
+
+  write.csv(output@data, sub("shp$", "csv", file_out), row.names = F, quote = F)
+
+  print("done")
+}
+
 #===============================================================================
 #' @title Create HydroBASINS catchment for a hydrometric station on a lake
 #'
@@ -402,9 +418,33 @@ DEMDrainageBasin <- function(point, DEM_path, DEM_source="NTS", saga_env,
 #'
 #' @param station_point a Spatialpointsdataframe of the hydrometric station
 #'
-#' @param saga_env an rsaga.environment object
+#' @param output_folder character string, file path indicating where to save the
+#' final output shapefile
 #'
-#' @param output_folder where to save final output
+#' @param code classification code describing station location. relative to
+#' waterbodies and containing hydrobasins polygon
+#'
+#' @param stn_num_col character string of the column name in station_point data
+#' frame that contains the station name, defaults to "station_number"
+#'
+#' @param stn_name_col character string of the column name in station_point data
+#' frame that contains the station name, defaults to "station_name"
+#'
+#' @details This function uses the following classification system for the
+#' code parameter, which describes the location of the station relative to
+#' the containing hydrobasin and the waterbody with which it is associated:
+#'
+#' P: containing sub-basin has 2 input sub-basins
+#'   Pcb Waterbody continues upstream and station on main branch below confluence
+#'   Pct Waterbody continues upstream and station on tributary branch above confluence
+#'   Pcm Waterbody continues upstream and station on main branch above confluence
+#'   Ps Waterbody terminates upstream within sub-basin
+#'
+#' I: containing sub-basin has 1 input sub-basins
+#'   Ic Waterbody continues upstream
+#'   Is Waterbody terminates upstream within sub-basin
+#'
+#' T: containing sub-basin has 0 input sub-basins
 #'
 #' @return A list containing two spatialpolygons data frames (the lake and
 #' the catchment area)
@@ -496,20 +536,19 @@ HYBASBasinLimits_Lake <- function(station_point, HYBAS, lakes_folder,
 
 
 #===============================================================================
-#' @title Calculate basin area for a hydrometric station on a lake using a DEM
+#' @title Calculate basin delineation for a hydrometric station on a lake using a DEM
 #'
-#' @description Create a drainage basin shapefile using a DEM and a
+#' @description Create a drainage basin shapefile using a DEM
 #'
-#' @param point a SpatialPointsDataFrame corresponding to a hydrometric station.
-#'  Must be in same coordinates system as DEM and coordinate system
-#' must be projected (not lat/long).  Must have longitude and latitude attributes.
+#' @param station_point a SpatialPointsDataFrame corresponding to a hydrometric
+#' station. Must be in same coordinates system as DEM and coordinate system
+#' must be projected (not lat/long).  Must have longitude and latitude
+#' attributes. Must also have station name and station number attributes.
 #'
-#' @param saga_env an rsaga.environment object
+#' @param lake_poly SpatialPolygonDataFrame of lake that the station is on
 #'
-#' @param outdir Directory to output final upslope shapefile
-#'
-#' @param DEM_source character, one of: c('CDED', 'NED', 'CDEM, CDSM', 'SHEDS').
-#'  Ignored if a DEM file is supplied to DEM_path
+#' @param lake_hybas_limit SpatialPolygonDataFrame of HydroBASINS upstream
+#' area delineation as produced by HYBASBasinLimits_Lake
 #'
 #' @param DEM_path One of:
 #'  (1) a file path to a directory containing DEM files either in the the format
@@ -519,10 +558,24 @@ HYBASBasinLimits_Lake <- function(station_point, HYBAS, lakes_folder,
 #'  projected coordinate system and the coordinate system should match that of
 #'  the point (e.g. Canada Albers Conformal Conic)
 #'
+#' @param outdir Directory to output final upslope shapefile
 #'
-#' @return A l
+#' @param saga_env A SAGA geoprocessing object.  Suggested version is 2.2.2.
+#'
+#' @param DEM_source character, one of: c('CDED', 'NED', 'CDEM, CDSM', 'SHEDS').
+#'  Ignored if a DEM file is supplied to DEM_path
+#'
+#'  @param stn_num_col character string of the column name in station_point data
+#' frame that contains the station name, defaults to "station_number"
+#'
+#' @param stn_name_col character string of the column name in station_point data
+#' frame that contains the station name, defaults to "station_name"
+#'
+#' @return No returned object, but creates a basin delineation from the DEM
 #'
 #' @export
+#'
+#' @keywords internal
 #===============================================================================
 LakeDEM <- function(station_point, lake_poly, lake_hybas_limit, DEM_path, outdir,
                     saga_env,
@@ -538,12 +591,12 @@ LakeDEM <- function(station_point, lake_poly, lake_hybas_limit, DEM_path, outdir
 
   final_name <- file.path(outdir, paste(station_number, "_upslope.shp", sep = ""))
 
-  # get snap distance for output
+  # get distance of lake to station for output (used for QC)
   snap_dist <- as.character(
     gDistance(sp::spTransform(station_point, sp::CRS(albers)),
                          sp::spTransform(lake_poly, sp::CRS(albers)), byid = TRUE))
 
-  # find most downstream hybas that overlaps lake
+  # find most downstream hybas polygon that intersects lake polygon
 
   lake_overlap <- sp::over(lake_poly, lake_hybas_limit, returnlist = T)
   if (class(lake_overlap) == "list"){lake_overlap <- lake_overlap[[1]]}
@@ -597,7 +650,6 @@ LakeDEM <- function(station_point, lake_poly, lake_hybas_limit, DEM_path, outdir
     }
 
   }else if (toupper(DEM_source) %in% c("CDED", "NED", "CDEM", "CDSM")){
-    print(DEM_source) #debug only
     in_DEM <- OverlayDEM(point, DEM_dir = DEM_path,
                          output_dir = saga_env$workspace,
                          product = DEM_source,
@@ -664,16 +716,13 @@ LakeDEM <- function(station_point, lake_poly, lake_hybas_limit, DEM_path, outdir
 #'
 #' @description This function acts a wrapper for two other functions
 #'
-#' @param point a SpatialPointsDataFrame corresponding to a hydrometric station.
+#' @param station_point a SpatialPointsDataFrame corresponding to a hydrometric station.
 #'  Must be in same coordinates system as DEM and coordinate system
 #' must be projected (not lat/long).  Must have longitude and latitude attributes.
 #'
-#' @param saga_env an rsaga.environment object
+#' @param HYBAS
 #'
-#' @param outdir_HYBAS Directory to output final upslope hydrobasins boundaries
-#'
-#' @param DEM_source character, one of: c('CDED', 'NED', 'CDEM, CDSM', 'SHEDS').
-#'  Ignored if a DEM file is supplied to DEM_path
+#' @param lakes_folder
 #'
 #' @param DEM_path One of:
 #'  (1) a file path to a directory containing DEM files either in the the format
@@ -683,6 +732,42 @@ LakeDEM <- function(station_point, lake_poly, lake_hybas_limit, DEM_path, outdir
 #'  projected coordinate system and the coordinate system should match that of
 #'  the point (e.g. Canada Albers Conformal Conic)
 #'
+#' @param DEM_source character, one of: c('CDED', 'NED', 'CDEM, CDSM', 'SHEDS').
+#'  Ignored if a DEM file is supplied to DEM_path
+#'
+#' @param outdir_DEM Directory to output final hydrobasins-derived delineation
+#'
+#' @param outdir_HYBAS Directory to output final upslope (DEM) delineation
+#'
+#' @param saga_env A SAGA geoprocessing object.  Suggested version is 2.2.2.
+#'
+#' @param code character, classification code describing location of station
+#' within cell and on stream
+#'
+#' @param stn_num_col character string of the column name in station_point data
+#' frame that contains the station name, defaults to "station_number"
+#'
+#' @param stn_name_col character string of the column name in station_point data
+#' frame that contains the station name, defaults to "station_name"
+#'
+#' @details This function uses the following classification system for the
+#' code parameter, which describes the location of the station relative to
+#' the containing hydrobasin and the waterbody with which it is associated:
+#'
+#' P: containing sub-basin has 2 input sub-basins
+#'   Pcb Waterbody continues upstream and station on main branch below confluence
+#'   Pct Waterbody continues upstream and station on tributary branch above confluence
+#'   Pcm Waterbody continues upstream and station on main branch above confluence
+#'   Ps Waterbody terminates upstream within sub-basin
+#'
+#' I: containing sub-basin has 1 input sub-basins
+#'   Ic Waterbody continues upstream
+#'   Is Waterbody terminates upstream within sub-basin
+#'
+#' T: containing sub-basin has 0 input sub-basins
+#'
+#' @return does not return an R object but creates two basin delineation files,
+#' one based on HydroBASINS and one basin on the DEM
 #'
 #' @export
 #===============================================================================

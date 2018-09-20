@@ -32,8 +32,8 @@
 #' @return Character string; a URL-encoded search string
 #'
 #' @examples
-#' QueryGeogratisAPI()
-#' QueryGeogratisAPI(list(q='Ottawa', theme=985), format='csv')
+#' CGNDBQueryAPI()
+#' CGNDBQueryAPI(list(q='Ottawa', theme=985), format='csv')
 #===============================================================================
 CGNDBQueryAPI <- function(terms, format=NULL){
   args <- lapply(names(terms), function(x) paste(x, "=", terms[x], sep = ""))
@@ -70,7 +70,7 @@ CGNDBDownloadAPI <- function(dstfile, terms, format){
 #===============================================================================
 #' @title download kml of hydrological feature
 #'
-#' @description Based on the name of a NHS station, attempts to download a
+#' @description Based on the name of a HYDAT survey station, attempts to download a
 #' kml corresponding to the hydrological feature being measured.
 #'
 #' @details After downloading, the kml is converted to a shapefile. Because of the
@@ -78,7 +78,7 @@ CGNDBDownloadAPI <- function(dstfile, terms, format){
 #' (points, lines or polygons). The script does its best to figure out
 #' which of the three should be preserved based on the station name.
 #'
-#' @param station name of a NHS / HYDAT hydrometric station or the name of a
+#' @param station name of a HYDAT hydrometric station or the name of a
 #' waterbody
 #'
 #' @param dstfile character string specifying a kml file to download
