@@ -1,0 +1,19 @@
+ Volume in drive M is NCRFS5_VOL1
+ Volume Serial Number is 6CBA-E4CB
+
+ Directory of M:\R\git\Basin-Delineation
+
+20/09/2018  01:42 PM    <DIR>          .
+20/09/2018  01:42 PM    <DIR>          ..
+20/09/2018  01:33 PM                32 .gitignore
+20/09/2018  01:33 PM                30 .Rbuildignore
+20/09/2018  01:41 PM    <DIR>          built
+20/09/2018  01:33 PM               695 DESCRIPTION
+20/09/2018  01:41 PM    <DIR>          examples
+20/09/2018  01:33 PM               407 HydroTool.Rproj
+20/09/2018  01:33 PM    <DIR>          man
+20/09/2018  01:33 PM             1,407 NAMESPACE
+20/09/2018  01:33 PM    <DIR>          R
+20/09/2018  01:42 PM                 0 README
+               6 File(s)          2,571 bytes
+               6 Dir(s)  15,612,063,744 bytes free
