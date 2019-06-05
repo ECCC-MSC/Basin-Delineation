@@ -3,8 +3,13 @@
 ## Introduction
 These scripts were created to generate basin delineations and other value-added products from Water Survey of Canada hydrometric stations.
 
+## Installation
+download the latest build from the /built subdirectory and from your R session type:
+
+    devtools::install_local(<path to *.tar.gz>)
+
 ## Dependencies
-Most dependencies will download automatically provided that you install from a built tar.gz file.  Others will need to be downloaded and installed manually such as [HYDAT](https://github.com/CentreForHydrology/HYDAT)
+Most dependencies will download automatically provided that you install using `devtools::install_local` from a built `*.tar.gz` file.  Others will need to be downloaded and installed manually such as [HYDAT](https://github.com/CentreForHydrology/HYDAT)
 
 ## Code
 
